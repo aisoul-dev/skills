@@ -6,6 +6,7 @@ A Claude Code plugin marketplace with my skills for Nuxt / Vue / TypeScript work
 |-------|--------------|
 | `/aisoul:untangle-audit` | Read-only structural audit, writes a decision log of PR-sized fixes |
 | `/aisoul:untangle-fix` | Applies one fix from that log as one small PR |
+| `/aisoul:pr-describe` | Short, evidence-first PR description sized to the diff |
 
 Details: [plugins/aisoul](plugins/aisoul).
 
@@ -46,7 +47,7 @@ tests/                              smoke tests for plugin scripts
 
 ## Rules for this repo
 
-- **General only.** No employer code, internal paths, colleague names or team rules. Project-specific instructions live in that project's own `.claude/`.
+- **General only.** No employer code, internal paths, colleague names or team rules. Project-specific facts live in the project, in an overlay at `.claude/aisoul/<skill>.md` that the skill reads when present; each skill that supports one ships an `overlay-template.md`.
 - **Skill names are `<group>-<action>`** (e.g. `untangle-audit`, `plan-create`), so related skills sort together.
 - **Scripts live in `scripts/<group>/`**, never at the plugin root, so groups do not collide.
 - **Every change to the plugin bumps its `version`** in `plugin.json` (semver) and adds a line to [CHANGELOG.md](CHANGELOG.md). Installed copies are cached per version, so an unbumped change may not reach users.
@@ -68,6 +69,7 @@ claude plugin install aisoul@aisoul
 
 # script tests
 bash tests/smoke.sh
+bash tests/pr.sh
 shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
 ```
 
