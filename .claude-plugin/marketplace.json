@@ -1,0 +1,17 @@
+{
+  "name": "aisoul",
+  "description": "aisoul skills for Claude Code: structural audits, refactoring and spec-driven workflow for Nuxt / Vue / TypeScript work.",
+  "owner": {
+    "name": "Grygorii Liashenko (aisoul)",
+    "url": "https://aisoul.dev"
+  },
+  "plugins": [
+    {
+      "name": "aisoul",
+      "source": "./plugins/aisoul",
+      "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring), more to come.",
+      "category": "development",
+      "tags": ["refactoring", "architecture", "audit", "workflow", "nuxt", "vue", "typescript"]
+    }
+  ]
+}

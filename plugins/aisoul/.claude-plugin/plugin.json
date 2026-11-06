@@ -1,0 +1,13 @@
+{
+  "name": "aisoul",
+  "version": "1.0.0",
+  "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring), more to come.",
+  "author": {
+    "name": "Grygorii Liashenko",
+    "url": "https://aisoul.dev"
+  },
+  "homepage": "https://github.com/aisoul-dev/skills",
+  "repository": "https://github.com/aisoul-dev/skills",
+  "license": "MIT",
+  "keywords": ["refactoring", "architecture", "audit", "change-coupling", "workflow", "nuxt", "vue", "typescript"]
+}
