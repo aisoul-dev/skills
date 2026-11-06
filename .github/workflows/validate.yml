@@ -31,7 +31,9 @@ jobs:
         run: shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
 
       - name: Smoke tests
-        run: bash tests/smoke.sh
+        run: |
+          bash tests/smoke.sh
+          bash tests/pr.sh
 
       - name: No em dashes in skills and docs
         run: |
