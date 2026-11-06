@@ -70,7 +70,9 @@ The document ends with the last section. No trailer and no attribution line, unl
 | New capability (feature, command, script, endpoint) | One real invocation and what it returned, plus the test that pins it. A capture if it has UI |
 | Documentation only | What a reader can now find or do, and that links and examples were followed and work |
 
-Name the two sides of a comparison by commit: the merge base (`git merge-base <base> <branch>`) against the branch head. For a squash-merged change, the sides are `<sha>^` and `<sha>`.
+A PR that matches several rows takes the evidence of each, briefly.
+
+Name the two sides of a comparison by commit: the merge base (`git merge-base <base> <branch>`) against the branch head. For a squash-merged change, the sides are `<sha>^` and `<sha>`. When the branch fixes something it added itself, so the merge base has nothing to compare, the sides are the commit before the fix and the head.
 
 **Live environment.** When the automated tests mock an external dependency (an API, a database, a payment provider), the defects that matter surface only when the branch runs against the real thing. When it was run that way, name the scenarios and the defects that run caught; a fix for something that would have shipped broken is labelled as such. When it was not run, the **Not checked** line says so: silence reads as "verified". The overlay names the environment. If the tests mock nothing, the rule does not apply and nothing is said.
 
@@ -85,7 +87,7 @@ Name the two sides of a comparison by commit: the merge base (`git merge-base <b
 | "improves performance" | a before/after table with the dataset size that produced it |
 | "handles the error" | the literal response shape it handles |
 
-A measured claim gives the number. A claim reasoned from the code says "reasoned, not measured": reviewers weigh the two differently.
+A measured claim gives the number. A claim reasoned from the code says "reasoned, not measured": reviewers weigh the two differently. A number someone else measured and you did not reproduce is attributed to them ("reported by the first review run"), not stated as yours.
 
 ## Refreshing an existing description
 

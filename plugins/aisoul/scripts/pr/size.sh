@@ -34,11 +34,11 @@ else
   base="${PR_BASE:-}"
   if [ -z "$base" ]; then
     base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-    [ -n "$base" ] || base=main
+    [ -n "$base" ] || { base=main; note=" (origin/HEAD not set, fell back to main)"; }
   fi
   branch="${1:-HEAD}"
   stat="$(git diff --shortstat "$base...$branch" -- "${pathspec[@]}")"
-  label="$branch against $base"
+  label="$branch against $base${note:-}"
 fi
 
 ins="$(sed -nE 's/.* ([0-9]+) insertion.*/\1/p' <<<"$stat")"
