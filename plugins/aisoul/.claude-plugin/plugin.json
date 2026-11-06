@@ -17,6 +17,7 @@
     "workflow",
     "nuxt",
     "vue",
-    "typescript"
+    "typescript",
+    "pull-requests"
   ]
 }
