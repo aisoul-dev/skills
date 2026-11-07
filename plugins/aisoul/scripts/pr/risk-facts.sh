@@ -105,7 +105,8 @@ lines="$(awk '
 
 # Signals read code only: prose files and paths matching PR_RISK_EXCLUDE are left out.
 excl="$(grep -v '^$' <<<"${PR_RISK_EXCLUDE:-}" | paste -sd'|' - || true)"
-code_lines="$(awk -v ex="$excl" '{
+# Patterns go through ENVIRON, not -v, which would eat their backslashes.
+code_lines="$(EXCL_RE="$excl" awk 'BEGIN { ex = ENVIRON["EXCL_RE"] } {
   p = $0; sub(/\t.*/, "", p)
   if (p ~ /\.(md|mdx|markdown|txt|rst)$/ || (ex != "" && p ~ ("^(" ex ")"))) next
   print
@@ -128,7 +129,8 @@ hits() {
 # catch blocks whose body, within the next 4 added lines of the same file,
 # only logs or is empty or a comment, with no rethrow and no reporting.
 quiet_catches() {
-  awk -v rep="$REPORTING" '
+  REP_RE="$REPORTING" awk '
+    BEGIN { rep = ENVIRON["REP_RE"] }
     function flush() {
       if (open && !loud && (logs || empty)) print first
       open = 0
