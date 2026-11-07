@@ -18,7 +18,7 @@ If the repository has `.claude/aisoul/pr-risk.md`, read it first. Path and API l
 
 | Key | Default |
 |-----|---------|
-| Base branch | `origin/HEAD`, else `main` |
+| Base branch | `origin/HEAD`, else `origin/main`, else `main` |
 | Sensitive paths | the built-in categories in `risk-facts.sh`: auth and access, money, secrets and security config, data and schema, infra and CI, dependencies |
 | Excluded from code signals | nothing beyond prose: Markdown and plain-text files never produce signals |
 | Error reporting | common APIs (`Sentry.*`, `captureException`, `reportError`, `logger.error`, ...) |
@@ -35,9 +35,10 @@ Facts first, judgement after.
    - Open PR: `gh pr view <n> --json title,body,baseRefName,headRefName,headRefOid,files,url` and `gh pr diff <n>`. If `gh pr` fails (GraphQL unavailable), use REST: `gh api repos/<owner>/<repo>/pulls/<n>` and `.../pulls/<n>/files`.
    - Merged PR: the base branch has moved past it, so the default range is empty. Use the PR's own base and head, `PR_BASE=<base.sha>` with `<head.sha>` from the pulls API, or its merge commit with `--squash <merge sha>` (compared with the first parent, so it covers the whole PR).
    - Local branch: the branch against the base.
-2. **Mechanical facts**, with the overlay's values passed through the environment (`PR_BASE`, `PR_RISK_SENSITIVE`, `PR_RISK_EXCLUDE`, `PR_RISK_REPORTING`, `PR_RISK_FLAGS`):
+2. **Mechanical facts**, with the overlay's values loaded into the environment first:
 
    ```bash
+   eval "$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/overlay-env.sh" .claude/aisoul/pr-risk.md)"
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/size.sh" <head>
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/risk-facts.sh" <head>
    ```
@@ -67,8 +68,8 @@ Each gets one verdict: ✅ low risk, 👀 some risk, ⚠️ high risk, or ❓ ca
 - ⚠️ user-visible or sensitive behaviour changed with no proof, tests were skipped or deleted to pass, or the description claims checks nobody could see run.
 
 **Reversibility**: if it goes wrong after merge, how expensive is undoing it?
-- ✅ a revert, released the project's usual way, restores the previous behaviour for everyone (two-way door), or the change sits behind a flag that can be turned off.
-- 👀 a revert works but leaves residue: data written in a new shape, caches, sent emails, a deploy coordinated with another service, copies users must update by hand.
+- ✅ a revert, released the project's usual way (the overlay's Rollback), restores the previous behaviour for everyone (two-way door), or the change sits behind a flag that can be turned off.
+- 👀 a revert works but leaves residue beyond the usual release path: data written in a new shape, caches, sent emails, a deploy coordinated with another service.
 - ⚠️ one-way door: destructive migration, data deleted or rewritten, an external contract published, a secret rotated, anything a revert does not bring back.
 
 **Observability**: if it breaks where it runs, does someone find out before a user has to report it?
@@ -109,7 +110,7 @@ Rules, not an average: a one-way door on shared code is high risk however good t
 ```
 
 - The five dimensions, in this order. ✅ gets no bullets unless something is worth knowing.
-- Every dimension that is not ✅ gets exactly one **Lower it:**: a concrete action (add a test for X, put Y behind a flag, report errors from Z), not advice.
+- Every dimension that is not ✅ gets exactly one **Lower it:**: a concrete action (add a test for X, put Y behind a flag, report errors from Z), not advice. When the risk is inherent and nothing cheap lowers it, write `Lower it: none, <why>` rather than invent an action.
 - Up to 250 words in total. Cite code as `path:line`; in a PR comment, as links to the head commit.
 - No bare `#<number>` outside code (GitHub autolinks it), no em dashes.
 

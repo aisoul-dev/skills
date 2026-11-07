@@ -84,7 +84,7 @@ has "$out" 'against its first parent'
 has "$out" '**Destructive data operations**'
 
 out="$(bash "$FACTS" clean 2>&1 || true)"
-has "$out" 'origin/HEAD not set, fell back to main'
+has "$out" 'fell back to main'
 
 # --- merged PRs: a merge commit, and an empty range with a hint ---------------
 git checkout -q main
@@ -177,6 +177,38 @@ hasnt "$out" 'notes.md:+'
 has "$out" 'app/Ünï.ts:+try { a() } catch (e) {}'
 hasnt "$out" 'app/b.ts:+try'
 
+# --- review findings on PR 2: labels with |, "-- a/" lines, paths with ":" ----
+git checkout -q -b parsing main
+mkdir -p .claude-plugin db app/fixtures
+printf '{}\n' > .claude-plugin/plugin.json
+printf -- '-- a/notes: legacy\nSELECT 1;\n' > db/q.sql
+git add -A && git commit -qm parsing-base
+git checkout -q -b parsing-change
+printf 'DELETE FROM users;\nSELECT 1;\n' > db/q.sql
+printf 'try { a() } catch (e) {}\n' > "app/a:b.ts"
+printf 'try { a() } catch (e) {}\n' > app/fixtures/f.ts
+printf '{ "v": 2 }\n' > .claude-plugin/plugin.json
+git add -A && git commit -qm parsing-change
+out="$(PR_BASE=parsing PR_RISK_SENSITIVE='(^|/)\.claude-plugin/' bash "$FACTS" parsing-change)"
+grep -qxF -- '- **project-sensitive `(^|/)\.claude-plugin/`**: `.claude-plugin/plugin.json`' <<<"$out" \
+  || fail "a pattern with | must keep its whole label: $(grep project-sensitive <<<"$out")"
+has "$out" 'db/q.sql:+DELETE FROM users;'
+has "$out" 'app/a:b.ts:+try { a() } catch (e) {}'
+out="$(PR_BASE=parsing PR_RISK_EXCLUDE='app/fixtures/' bash "$FACTS" parsing-change)"
+hasnt "$out" 'app/fixtures/f.ts:+'
+out="$(PR_BASE=parsing PR_RISK_EXCLUDE='fixtures/' bash "$FACTS" parsing-change)"
+has "$out" 'app/fixtures/f.ts:+'   # anchored at the repo root, as documented
+
+# --- overlay-env.sh: the repo's overlay and the template load as documented ---
+ENV="$ROOT/plugins/aisoul/scripts/pr/overlay-env.sh"
+out="$(bash "$ENV" "$ROOT/.claude/aisoul/pr-risk.md")"
+has "$out" "export PR_BASE='origin/main'"
+has "$out" "export PR_RISK_EXCLUDE='plugins/aisoul/scripts/"
+out="$(bash "$ENV" "$ROOT/plugins/aisoul/skills/pr-risk/overlay-template.md")"
+has "$out" "export PR_RISK_REPORTING='useErrorReporter|trackError'"
+( eval "$out"; [ "$(printf '%s\n' "$PR_RISK_SENSITIVE" | wc -l)" = 3 ] ) || fail "sensitive paths must stay one per line"
+[ -z "$(bash "$ENV" /nonexistent.md)" ] || fail "a missing overlay must print nothing"
+
 # --- risk-check.sh: the skill's own example passes, broken ones fail ----------
 CHECK="$ROOT/plugins/aisoul/scripts/pr/risk-check.sh"
 awk '/^```markdown$/ { i = 1; next } i && /^```$/ { exit } i' "$ROOT/plugins/aisoul/skills/pr-risk/SKILL.md" > risk-example.md
@@ -200,5 +232,8 @@ has "$out" "FAIL  no verdict on: Verification"
 has "$out" "FAIL  expected 5 dimensions, found 4"
 has "$out" "FAIL  no **Not assessed:** line"
 has "$out" "FAIL  bare #<number>"
+
+sed '1s/(rule 5)$/as rule 5 says/' risk-example.md > risk-noparen.md
+if bash "$CHECK" risk-noparen.md >/dev/null; then fail "a headline without (rule N) must fail"; fi
 
 echo "pr-risk: OK"
