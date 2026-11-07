@@ -9,6 +9,7 @@ Grygorii Liashenko's skill set for Claude Code, tuned for Nuxt / Vue / TypeScrip
 | `/aisoul:untangle-audit [path or concern]` | untangle | Read-only. Measures change locality and patches, finds causes, writes a decision log of PR-sized fixes to `docs/untangle/`. Changes no code. |
 | `/aisoul:untangle-fix <log path> <fix id>` | untangle | Applies one fix from the log as one branch and one PR: re-verify, pin behavior with tests, implement, separate review, update the log. |
 | `/aisoul:pr-describe [branch \| --squash <sha>]` | pr | Writes a short, evidence-first PR description whose length follows the diff. Also triggers when you ask for a PR description. |
+| `/aisoul:pr-risk [PR \| branch \| --squash <sha>]` | pr | Assesses merge risk in five dimensions with evidence and one risk-lowering action each. Read-only; posts a PR comment only when asked. Also triggers when you ask how risky a PR is. |
 
 Skills are named `<group>-<action>` so related ones sort together in `/` completion. Heavy workflows run only when you call them (`disable-model-invocation: true`).
 
@@ -29,10 +30,27 @@ Scripts in `scripts/pr/`:
 
 | Script | What it does |
 |--------|--------------|
-| `size.sh [branch \| --squash <sha>]` | changed lines without excluded paths, and the shape (`PR_BASE`, `PR_EXCLUDE`, `PR_SMALL_MAX`) |
+| `size.sh [branch \| --squash <sha>]` | changed lines without excluded paths, and the shape (`PR_BASE`, `PR_EXCLUDE`, `PR_SMALL_MAX`); exit 2 on an empty range |
 | `check.sh <file> <small\|large>` | word budget, Not checked line, no headings in small, no bare `#<number>` outside code, no em dash |
+| `risk-facts.sh [branch \| --squash <sha>]` | changed files, sensitive paths by category, signals in changed lines (`PR_BASE`, `PR_RISK_*`); exit 2 on an empty range |
+| `risk-check.sh <file>` | a pr-risk assessment against its output format |
+| `overlay-env.sh <overlay.md>` | an overlay's base, paths and API lists as environment variables for the scripts |
 
 Overlay: copy `skills/pr-describe/overlay-template.md` to `.claude/aisoul/pr-describe.md` in the project and fill in location, title format, excluded paths, what the Checks tab shows, the live environment, screenshot widths, an optional disclosure line and an optional house example.
+
+`/aisoul:pr-risk` answers the reviewer's real question: what happens if this is merged and it is wrong.
+
+| Dimension | Asks |
+|-----------|------|
+| Scope fit | does the change do what it says, and only that? |
+| Blast radius | if it is wrong, how much breaks, for whom? Sensitive paths raise it |
+| Verification | is it proven at the level the change needs? |
+| Reversibility | does a revert undo it, or is it a one-way door? |
+| Observability | if it breaks in production, does someone find out first? |
+
+Overall risk comes from explicit rules (a one-way door on anything but an isolated change is high; a large blast radius without proof is high; two high dimensions are high), not an average that would hide them. `scripts/pr/risk-facts.sh` collects the mechanical facts first: sensitive paths by category and signals in the changed lines. Overlay: `skills/pr-risk/overlay-template.md` to `.claude/aisoul/pr-risk.md` (extra sensitive paths, error reporting and flag APIs, how rollback works).
+
+Use it as a review aid (chat, or a PR comment when asked) or as a self-check before asking for review: pair it with `pr-describe`, whose Evidence section is what Verification reads.
 
 ## untangle
 
@@ -78,3 +96,4 @@ Nothing is installed into the audited project and no config is written there.
 
 - **untangle**: inspired by [caldoai/skills `untangle-codebase`](https://github.com/caldoai/skills) (MIT). The taxonomy, metrics, scripts and workflow here are independent. Background reading is listed at the end of the audit skill.
 - **pr-describe**: ideas taken from Hugo RCD's [What my pull requests look like now](https://hugorcd.com/writing/what-my-pull-requests-look-like-now): evidence chosen by change type, an order the reader can stop at, "before" from the base branch, demo data only, one line on what was not checked. The size rule, word budgets, scripts and overlay are ours.
+- **pr-risk**: inspired by Warp's [`merge-risk`](https://github.com/warpdotdev/common-skills) (MIT), which credits Matt Pocock's `pr` skill. The idea of rating alignment, impact, verification, rollback cost and error detection comes from there; the wording, the rule-based overall risk, the "Lower it" actions, the self-check mode, the facts script and the overlay are ours.

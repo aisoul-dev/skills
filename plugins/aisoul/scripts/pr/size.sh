@@ -4,18 +4,17 @@
 #
 #   size.sh                 # current branch against the base
 #   size.sh <branch>        # a branch against the base
-#   size.sh --squash <sha>  # a squash-merged commit against its parent
+#   size.sh --squash <sha>  # a squash or merge commit against its first parent
 #
 # Env:
-#   PR_BASE       base ref (default: origin/HEAD, else main)
+#   PR_BASE       base ref (default: origin/HEAD, else origin/main, else main)
 #   PR_EXCLUDE    space-separated paths excluded on top of the defaults
 #   PR_SMALL_MAX  threshold for the small shape (default 50)
 set -euo pipefail
 
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-  echo "pr-size: run this from inside a git repository" >&2
-  exit 1
-}
+# shellcheck source=SCRIPTDIR/lib.sh
+source "$(dirname "$0")/lib.sh"
+require_repo pr-size
 
 SMALL_MAX="${PR_SMALL_MAX:-50}"
 DEFAULT_EXCLUDE="docs pnpm-lock.yaml package-lock.json yarn.lock bun.lock bun.lockb"
@@ -28,17 +27,21 @@ done
 
 if [ "${1:-}" = "--squash" ]; then
   sha="${2:?usage: size.sh --squash <sha>}"
-  stat="$(git show --shortstat --format= "$sha" -- "${pathspec[@]}")"
-  label="squash $sha (against $sha^)"
+  stat="$(git diff --shortstat "$sha^1" "$sha" -- "${pathspec[@]}")"
+  raw="$(git diff --shortstat "$sha^1" "$sha")"
+  label="commit $sha (against its first parent; a merge commit counts its whole PR)"
 else
-  base="${PR_BASE:-}"
-  if [ -z "$base" ]; then
-    base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-    [ -n "$base" ] || { base=main; note=" (origin/HEAD not set, fell back to main)"; }
-  fi
+  resolve_base
+  base="$BASE"; note="$BASE_NOTE"
   branch="${1:-HEAD}"
   stat="$(git diff --shortstat "$base...$branch" -- "${pathspec[@]}")"
+  raw="$(git diff --shortstat "$base...$branch")"
   label="$branch against $base${note:-}"
+fi
+
+if [ -z "$raw" ]; then
+  echo "$label: empty diff. $(empty_range_hint)" >&2
+  exit 2
 fi
 
 ins="$(sed -nE 's/.* ([0-9]+) insertion.*/\1/p' <<<"$stat")"
