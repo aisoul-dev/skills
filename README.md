@@ -7,6 +7,7 @@ A Claude Code plugin marketplace with my skills for Nuxt / Vue / TypeScript work
 | `/aisoul:untangle-audit` | Read-only structural audit, writes a decision log of PR-sized fixes |
 | `/aisoul:untangle-fix` | Applies one fix from that log as one small PR |
 | `/aisoul:pr-describe` | Short, evidence-first PR description sized to the diff |
+| `/aisoul:pr-risk` | Merge-risk assessment in five dimensions, for a reviewer or as a self-check |
 
 Details: [plugins/aisoul](plugins/aisoul).
 
@@ -70,6 +71,7 @@ claude plugin install aisoul@aisoul
 # script tests
 bash tests/smoke.sh
 bash tests/pr.sh
+bash tests/pr-risk.sh
 shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
 ```
 

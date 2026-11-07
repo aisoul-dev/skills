@@ -2,6 +2,12 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.2.0 (2026-11-07)
+
+### pr
+- `pr-risk`: merge-risk assessment in five dimensions (scope fit, blast radius, verification, reversibility, observability), each with evidence and one action that lowers it, and an overall low/medium/high decided by explicit rules rather than an average. Review mode prints to chat and posts only when asked; self-check mode applies the cheap actions and reports the risk before and after.
+- `scripts/pr/risk-facts.sh`: changed files, sensitive paths by category, and signals in changed lines (swallowed errors, removed error reporting, type escapes, skipped or deleted tests, destructive data operations, feature flags). Overlay at `.claude/aisoul/pr-risk.md`.
+
 ## 1.1.0 (2026-11-06)
 
 ### pr

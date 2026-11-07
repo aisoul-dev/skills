@@ -9,7 +9,7 @@
     {
       "name": "aisoul",
       "source": "./plugins/aisoul",
-      "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring) and pr-describe (short, evidence-first PR descriptions).",
+      "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring), pr-describe (evidence-first PR descriptions) and pr-risk (merge-risk assessment).",
       "category": "development",
       "tags": [
         "refactoring",
@@ -19,7 +19,9 @@
         "nuxt",
         "vue",
         "typescript",
-        "pull-requests"
+        "pull-requests",
+        "merge-risk",
+        "code-review"
       ]
     }
   ]
