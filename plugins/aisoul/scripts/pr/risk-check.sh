@@ -26,11 +26,10 @@ prose="$(awk '
   { line = $0; gsub(/<!--.*-->/, "", line); gsub(/`[^`]*`/, "", line); print NR ": " line }
 ' "$file")"
 
-if grep -qE '^1: \*\*Merge risk: (low|medium|high)( \(was (low|medium|high)\))?\*\*.*\(rule [1-5]\)' <<<"$prose" \
-  || grep -qE '^1: \*\*Merge risk: (low|medium|high)( \(was (low|medium|high)\))?\*\*.*rule [1-5]' <<<"$prose"; then
+if grep -qE '^1: \*\*Merge risk: (low|medium|high)( \(was (low|medium|high)\))?\*\*.*\(rule [1-5]\)[[:space:]]*$' <<<"$prose"; then
   ok "headline with level and rule"
 else
-  fail "first line must be '**Merge risk: <low|medium|high>**: <why> (rule N)'"
+  fail "first line must be '**Merge risk: <low|medium|high>**: <why> (rule N)', ending with the rule"
 fi
 
 # Dimensions in order, each with a verdict; non-✅ ones need a Lower it bullet.

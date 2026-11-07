@@ -2,7 +2,7 @@
 
 ## Base branch
 
-`main`
+`origin/main`
 
 ## Sensitive paths
 

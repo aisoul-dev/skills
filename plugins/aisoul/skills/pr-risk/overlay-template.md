@@ -3,17 +3,19 @@
 <!--
 Copy this file to `.claude/aisoul/pr-risk.md` in a repository to adapt
 /aisoul:pr-risk to it. Every section is optional: delete what you do not need
-and the default applies. Keep the headings as they are.
+and the default applies. Keep the headings as they are: `overlay-env.sh`
+reads the first ```text block (or, for the base, the first `code`) under them.
 -->
 
 ## Base branch
 
-`main`
+`origin/main`
 
 ## Sensitive paths
 
-Extra path patterns (extended regex, one per line), passed as `PR_RISK_SENSITIVE`.
-Each is checked in addition to the built-in categories:
+Extra path patterns (extended regex, one per line, matched anywhere in the
+path), passed as `PR_RISK_SENSITIVE`. Each is checked in addition to the
+built-in categories:
 
 ```text
 app/composables/usePermissions
@@ -23,8 +25,9 @@ server/api/admin/
 
 ## Excluded from code signals
 
-Paths (extended regex, one per line) whose changed lines produce no signals,
-passed as `PR_RISK_EXCLUDE`. Markdown and plain-text files are always excluded.
+Paths (extended regex, one per line, anchored at the repository root) whose
+changed lines produce no signals, passed as `PR_RISK_EXCLUDE`. Markdown and
+plain-text files are always excluded.
 
 ```text
 tests/fixtures/

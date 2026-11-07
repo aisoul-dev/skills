@@ -31,8 +31,11 @@ Scripts in `scripts/pr/`:
 
 | Script | What it does |
 |--------|--------------|
-| `size.sh [branch \| --squash <sha>]` | changed lines without excluded paths, and the shape (`PR_BASE`, `PR_EXCLUDE`, `PR_SMALL_MAX`) |
+| `size.sh [branch \| --squash <sha>]` | changed lines without excluded paths, and the shape (`PR_BASE`, `PR_EXCLUDE`, `PR_SMALL_MAX`); exit 2 on an empty range |
 | `check.sh <file> <small\|large>` | word budget, Not checked line, no headings in small, no bare `#<number>` outside code, no em dash |
+| `risk-facts.sh [branch \| --squash <sha>]` | changed files, sensitive paths by category, signals in changed lines (`PR_BASE`, `PR_RISK_*`); exit 2 on an empty range |
+| `risk-check.sh <file>` | a pr-risk assessment against its output format |
+| `overlay-env.sh <overlay.md>` | an overlay's base, paths and API lists as environment variables for the scripts |
 
 Overlay: copy `skills/pr-describe/overlay-template.md` to `.claude/aisoul/pr-describe.md` in the project and fill in location, title format, excluded paths, what the Checks tab shows, the live environment, screenshot widths, an optional disclosure line and an optional house example.
 
