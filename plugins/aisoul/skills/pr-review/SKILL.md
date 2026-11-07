@@ -21,18 +21,22 @@ If the repository has `.claude/aisoul/pr-review.md`, read it first. Its values r
 
 | Key | Default |
 |-----|---------|
-| Base | `origin/HEAD`, else `origin/main` |
+| Base | `origin/HEAD`, else `origin/main`, else `main` |
 | Bug hunt | the `code-review` skill at `xhigh` against the base, if it is available; otherwise Step 2's own hunt |
-| Gates | detected from the project: typecheck, lint and format on the changed files, the unit suite (see Step 4) |
+| Gates | what CI runs, read from its config (`.github/workflows/`, `.gitlab-ci.yml`, ...), run locally; else detected from the project (Step 4) |
 | Ratchets | none. A ratchet is a pattern a PR must not add more of than it removes, e.g. explicit `any` |
-| Constraints | the "must" and "never" rules in the repo's `CLAUDE.md` or `AGENTS.md` |
+| Constraints | the "must" and "never" rules in the repo's `CLAUDE.md` or `AGENTS.md`, and the Constraints or Runtime sections of any overlay in `.claude/aisoul/` |
 | Feature flags | none known |
 | Contract source | none: API claims are marked _inferred_ |
 | Own-branch handoff | a task list for the next implementation run |
 | Comment language | English |
 | Disclosure | none; when set, the review summary ends with it |
 
-Scripts are in `${CLAUDE_PLUGIN_ROOT}/scripts/pr/`. All take `PR_BASE`.
+Scripts are in `${CLAUDE_PLUGIN_ROOT}/scripts/pr/`. All take `PR_BASE`; load the overlay's base once so every script and `pr-risk` compare against the same range:
+
+```bash
+eval "$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/overlay-env.sh" .claude/aisoul/pr-review.md)"
+```
 
 ## Step 1: Scope
 
@@ -40,7 +44,7 @@ Scripts are in `${CLAUDE_PLUGIN_ROOT}/scripts/pr/`. All take `PR_BASE`.
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/scope.sh" [<branch>]
 ```
 
-It fetches, then prints commits ahead and behind, whether merging the base is clean, the commit list and the diffstat. Compare against the remote base, not a local branch, which may be stale. If the user named a branch or PR, review that one, checked out or by ref.
+It fetches (set `PR_NO_FETCH=1` when the repository must not be touched), then prints commits ahead and behind, whether merging the base is clean, the commit list and the diffstat. Compare against the remote base, not a local branch, which may be stale. If the user named a branch or PR, review that one, checked out or by ref.
 
 Act on it before the bug hunt:
 
@@ -52,7 +56,7 @@ In own-branch mode, tell the user to update from the base. Do not merge it yours
 
 ## Step 2: Bug hunt
 
-Run the overlay's bug hunt. By default, the `code-review` skill with args `xhigh <base>`, unless the user named another level. Its output varies a lot from run to run: the same branch can return 15 findings once and 1 the next time. Let it report its findings; they are the first input for the ledger.
+Run the overlay's bug hunt. Its findings have the source _bug hunt_, whoever ran it. By default, the `code-review` skill with args `xhigh <base>`, unless the user named another level. Its output varies a lot from run to run: the same branch can return 15 findings once and 1 the next time. Let it report its findings; they are the first input for the ledger.
 
 Without a `code-review` skill, hunt yourself: read the full diff, then for each changed function the callers and the tests that reach it, and look for broken flows, unhandled states and errors, and wrong assumptions about inputs. Use subagents per area for a large diff.
 
@@ -83,7 +87,7 @@ It lists remote branches built on this branch's commits, each with its own chang
 
 ## Step 4: Mechanical gates and merge risk
 
-Run the overlay's gates. Without an overlay, detect them: the package manager from the lockfile, then the `typecheck`, `lint` and `test` scripts in `package.json` (or `tsc --noEmit` when there is a `tsconfig.json`). Lint and format only the changed files, and never pass an empty list, which lints the whole repo:
+Run the overlay's gates. Without an overlay, mirror CI: read its config and run the same commands locally, as far as they run without CI's secrets or services. Without CI config, detect them: the package manager from the lockfile, then the `typecheck`, `lint` and `test` scripts in `package.json` (or `tsc --noEmit` when there is a `tsconfig.json`). Lint and format only the changed files, and never pass an empty list, which lints the whole repo:
 
 ```bash
 git diff --name-only --diff-filter=d <base>...HEAD | grep -E '\.(ts|tsx|js|vue)$' | xargs -r <pm> exec eslint
@@ -100,9 +104,9 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/ratchet.sh" '<pattern>' -- <pathspec>...
 
 It prints added, removed and net, and exits 0 (net down), 1 (even) or 2 (net up).
 
-A gate is red only on errors, test failures, conflicts, or a ratchet the branch moves the wrong way. A ratchet that stays even is one Non-blocking row with source _own_, when the overlay says every PR should move it. Each line the branch added that gets lint warnings becomes one Non-blocking row, source _own_, listing every rule that fires on it.
+Report each gate's own counts (files, tests, errors); when a runner prints only a pass line, quote that line. A gate is red only on errors, test failures, conflicts, or a ratchet the branch moves the wrong way. A warning about the whole repository (a validator, an audit) counts only if the base does not show it too; otherwise it is _Non-blocking (pre-existing)_. A ratchet that stays even is one Non-blocking row with source _own_, when the overlay says every PR should move it. Each line the branch added that gets lint warnings becomes one Non-blocking row, source _own_, listing every rule that fires on it.
 
-**Merge risk.** Run `/aisoul:pr-risk` in review mode on the same range, reusing the gates' results as proof. Its headline goes into the verdict. Each ⚠️ dimension becomes a ledger row with source _pr-risk_, Non-blocking unless it also meets Step 5.
+**Merge risk.** Run `/aisoul:pr-risk` in review mode on the same range (the same `PR_BASE`), reusing the gates' results as proof. Its headline goes into the verdict, its whole assessment into the reply (Step 6, part 3). Each ⚠️ dimension also becomes a ledger row with source _pr-risk_, Non-blocking unless it meets Step 5. The verdict is about defects and the risk about consequences: a high risk with no Blocker still gives **✅ Approve with comments**, and the summary's first bullet names the risk.
 
 End-to-end runs, browser checks and CI are not run by default; read CI's state for the pushed head if `gh` is available. Anything not run goes under _Not checked_.
 
@@ -132,18 +136,19 @@ Verdict:
 
 Prose and the ledger in the user's language; comment blocks in the overlay's comment language, because they go to the PR.
 
-1. **Verdict**: one line with the verdict and one sentence why, then the merge risk headline from `pr-risk`. Merge conditions directly under it.
-2. **Gates**: one line per gate with its result (for tests, the counts), then a _Not checked:_ line.
-3. **Ledger, every finding**: a table `#` | source (bug hunt / _own_ / _pr-risk_) | finding | `path:line` | status (Blocker / Non-blocking / Non-blocking (pre-existing) / Non-blocking (unconfirmed) / Handled in X / Dismissed) | why.
+1. **Verdict**: one line with the verdict and one sentence why, then the merge risk headline from `pr-risk`. Directly under it, the merge conditions, or `Merge conditions: none`. A condition is something that must happen with or before this merge: an update from the base, merging together with a stacked branch that handles a finding. A stacked branch that handles nothing sets no condition.
+2. **Gates**: one line per gate with its result and counts, then a _Not checked:_ line.
+3. **Merge risk**: the `pr-risk` assessment as it came out, in its own format.
+4. **Ledger, every finding**: a table `#` | source (bug hunt / _own_ / _pr-risk_) | finding | `path:line` | status (Blocker / Non-blocking / Non-blocking (pre-existing) / Non-blocking (unconfirmed) / Handled in X / Dismissed) | why.
    - Every bug-hunt finding appears in at least one row, whole or split.
    - Every _own_ observation from Steps 3 and 4 has its own row.
    - The table is required even if the bug hunt says not to repeat its findings: the reviewer re-checks the triage from it.
-4. **Paste-ready comments**: Blockers first, then Non-blocking. Dismissed and Handled findings get none. Each one has:
-   - a heading `n`, linked to where the fix goes, which can be a different file from the finding's `path:line`;
+5. **Paste-ready comments**: Blockers first, then Non-blocking. Dismissed, Handled and pre-existing findings get none: pre-existing ones go to the summary as tickets to file. Each comment has:
+   - a heading `### [n](<link>)`, linked to where the fix goes, which can be a different file from the finding's `path:line`; when the fix belongs in a file that does not exist yet, link the code it would replace;
    - directly under it, the placement line, so the reviewer does not have to open the link to know where the comment goes;
    - both from `bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/comment-link.sh" <path> <line> [<end line>] [<branch>]`, which links to the pushed commit (a local-only sha gives a 404), adds `?plain=1` for Markdown, and picks the placement form from GitHub's diff view: a line or lines in the diff, a file-level comment, or a general PR comment;
    - a fenced `markdown` block with the comment, starting `**Blocking:**` or `**Non-blocking:**`: the defect, a concrete scenario and the suggested fix. A Blocking comment also gives the proof from Step 5. A duplication comment lists every copy and where the shared version should live. Fence code inside it with `~~~`. Refer to other findings by their content, never as `#n`: GitHub turns `#12` into a link to issue or PR 12. This applies to the summary too.
-5. **Review summary**: one fenced `markdown` block for the review body, 2 to 5 bullets on blockers, conditions and the merge risk. The overlay's disclosure line, if any, at the end.
+6. **Review summary**: one fenced `markdown` block for the review body, 2 to 5 bullets on blockers, conditions, the merge risk and tickets to file for pre-existing findings. The overlay's disclosure line, if any, at the end.
 
 ## Own-branch mode
 
@@ -151,8 +156,8 @@ When the user asks to check their own branch before opening a PR (`--own`). The 
 
 Run Steps 1 to 5 unchanged; replace Step 6 with:
 
-1. **Verdict, merge risk and gates**: as Step 6, parts 1 and 2.
-2. **Ledger**: as Step 6, part 3.
+1. **Verdict, gates and merge risk**: as Step 6, parts 1 to 3.
+2. **Ledger**: as Step 6, part 4.
 3. **Fix list** for the overlay's handoff: Blockers only, one task each: `path:line`, what is wrong, and the failing test to write first, so the fix starts from a red test.
 4. **Extract**: every Duplication row with its copies and the target location. Cheaper now than in a follow-up ticket.
 5. **Lower the risk**: the `pr-risk` **Lower it** actions that are cheap and in the branch's scope.

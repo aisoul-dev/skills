@@ -8,24 +8,20 @@
 # reversed copy of the base), whether it merges cleanly with this branch and
 # with the base, and how far behind the base it is. With paths, also B's diff
 # for those paths, to see whether B fixes a finding.
-# Env: PR_BASE (default: origin/HEAD, else origin/main).
+# Env: PR_BASE (default: origin/HEAD, else origin/main, else main).
 set -euo pipefail
 
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-  echo "pr-stacked: run this from inside a git repository" >&2
-  exit 1
-}
+# shellcheck source=SCRIPTDIR/lib.sh
+source "$(dirname "$0")/lib.sh"
+require_repo pr-stacked
 
 branch=HEAD
 if [ "${1:-}" != "" ] && [ "${1:-}" != "--" ]; then branch="$1"; shift; fi
 [ "${1:-}" = "--" ] && shift
 paths=("$@")
 
-base="${PR_BASE:-}"
-if [ -z "$base" ]; then
-  base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-  [ -n "$base" ] || base=origin/main
-fi
+resolve_base
+base="$BASE"
 
 self_remote=""
 self_name="$(git rev-parse --abbrev-ref "$branch" 2>/dev/null || true)"
@@ -63,10 +59,15 @@ while read -r b; do
   echo "- Merge with $branch: $(merge_state "$branch" "$b"); with $base: $(merge_state "$base" "$b")"
   echo "- Behind $base: $(git rev-list --count "$b..$base") commits"
   if [ "${#paths[@]}" -gt 0 ]; then
-    echo
-    echo '```diff'
-    git -c core.quotePath=false diff "$mb" "$b" -- "${paths[@]}"
-    echo '```'
+    d="$(git -c core.quotePath=false diff "$mb" "$b" -- "${paths[@]}")"
+    if [ -z "$d" ]; then
+      echo "- No changes to: ${paths[*]}"
+    else
+      echo
+      echo '```diff'
+      echo "$d"
+      echo '```'
+    fi
   fi
   echo
 done <<<"$stacked"

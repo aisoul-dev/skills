@@ -5,22 +5,19 @@
 #
 # Prints commits behind and ahead, whether merging the base is clean, the
 # conflicting files if not, the commit list and the diffstat.
-# Env: PR_BASE (default: origin/HEAD, else origin/main), PR_NO_FETCH=1 to skip fetching.
+# Env: PR_BASE (default: origin/HEAD, else origin/main, else main), PR_NO_FETCH=1 to
+# skip the fetch (it updates remote refs in the reviewed repository).
 # Exit: 0 up to date or clean merge, 3 behind with conflicts (stop the review).
 set -euo pipefail
 
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-  echo "pr-scope: run this from inside a git repository" >&2
-  exit 1
-}
+# shellcheck source=SCRIPTDIR/lib.sh
+source "$(dirname "$0")/lib.sh"
+require_repo pr-scope
 
 [ -n "${PR_NO_FETCH:-}" ] || git fetch -q origin 2>/dev/null || echo "scope: fetch failed, using local refs" >&2
 
-base="${PR_BASE:-}"
-if [ -z "$base" ]; then
-  base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-  [ -n "$base" ] || base=origin/main
-fi
+resolve_base
+base="$BASE"
 git rev-parse --verify --quiet "$base" >/dev/null || { echo "scope: base '$base' not found; set PR_BASE" >&2; exit 1; }
 branch="${1:-HEAD}"
 

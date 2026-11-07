@@ -12,22 +12,27 @@
 #        **File:** `<path>` · **Lines:** <n>–<m>
 #        **File:** `<path>` · file-level comment (L<n> is outside the diff)
 #        **Where:** general PR comment (about `<path>:<n>`)
-# Env: PR_BASE (default: origin/HEAD, else origin/main), PR_REPO to override owner/repo.
-# Exit 1 when the branch is not pushed: a local-only sha gives a 404.
+# Env: PR_BASE (default: origin/HEAD, else origin/main, else main), PR_REPO to override owner/repo.
+# Exit 1 when the branch is not pushed (a local-only sha gives a 404), on a
+# detached HEAD without a branch argument, or when the line is past the end of
+# the pushed file. Warns when the local file differs from the pushed one.
 set -euo pipefail
+# shellcheck source=SCRIPTDIR/lib.sh
+source "$(dirname "$0")/lib.sh"
+require_repo pr-comment-link
 
 path="${1:?usage: comment-link.sh <path> <line> [<end line>] [<branch>]}"
 line="${2:?usage: comment-link.sh <path> <line> [<end line>] [<branch>]}"
 end="${3:-}"
 branch="${4:-}"
 if [ -n "$end" ] && ! [[ "$end" =~ ^[0-9]+$ ]]; then branch="$end"; end=""; fi
-[ -n "$branch" ] || branch="$(git rev-parse --abbrev-ref HEAD)"
-
-base="${PR_BASE:-}"
-if [ -z "$base" ]; then
-  base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-  [ -n "$base" ] || base=origin/main
+if [ -z "$branch" ]; then
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  [ "$branch" != HEAD ] || { echo "comment-link: detached HEAD; pass the branch name as the last argument" >&2; exit 1; }
 fi
+
+resolve_base
+base="$BASE"
 
 repo="${PR_REPO:-}"
 if [ -z "$repo" ]; then
@@ -38,6 +43,14 @@ fi
 
 sha="$(git rev-parse --verify --quiet "origin/${branch#origin/}" || true)"
 [ -n "$sha" ] || { echo "comment-link: origin/${branch#origin/} not found; push the branch first (a local sha gives a 404)" >&2; exit 1; }
+
+# Line numbers must come from the pushed version, which is what the link shows.
+total="$(git show "$sha:$path" 2>/dev/null | wc -l | tr -d ' ')" || total=0
+[ "$total" -gt 0 ] || { echo "comment-link: $path does not exist at $(git rev-parse --short "$sha")" >&2; exit 1; }
+[ "${end:-$line}" -le "$total" ] || { echo "comment-link: $path has $total lines at $(git rev-parse --short "$sha"), not ${end:-$line}" >&2; exit 1; }
+if [ -f "$path" ] && ! git show "$sha:$path" | cmp -s - "$path"; then
+  echo "comment-link: warning: local $path differs from the pushed version; check that line $line still points at the same code" >&2
+fi
 
 plain=""
 case "$path" in *.md|*.mdx|*.markdown) plain="?plain=1" ;; esac
