@@ -4,7 +4,7 @@
 #
 #   size.sh                 # current branch against the base
 #   size.sh <branch>        # a branch against the base
-#   size.sh --squash <sha>  # a squash-merged commit against its parent
+#   size.sh --squash <sha>  # a squash or merge commit against its first parent
 #
 # Env:
 #   PR_BASE       base ref (default: origin/HEAD, else main)
@@ -28,8 +28,9 @@ done
 
 if [ "${1:-}" = "--squash" ]; then
   sha="${2:?usage: size.sh --squash <sha>}"
-  stat="$(git show --shortstat --format= "$sha" -- "${pathspec[@]}")"
-  label="squash $sha (against $sha^)"
+  stat="$(git diff --shortstat "$sha^1" "$sha" -- "${pathspec[@]}")"
+  raw="$(git diff --shortstat "$sha^1" "$sha")"
+  label="commit $sha (against its first parent; a merge commit counts its whole PR)"
 else
   base="${PR_BASE:-}"
   if [ -z "$base" ]; then
@@ -38,7 +39,14 @@ else
   fi
   branch="${1:-HEAD}"
   stat="$(git diff --shortstat "$base...$branch" -- "${pathspec[@]}")"
+  raw="$(git diff --shortstat "$base...$branch")"
   label="$branch against $base${note:-}"
+fi
+
+if [ -z "$raw" ]; then
+  echo "$label: empty diff. If the branch is already merged, the base has moved past it:" >&2
+  echo "pass PR_BASE=<the PR's base sha> with the head sha, or --squash <merge commit>." >&2
+  exit 2
 fi
 
 ins="$(sed -nE 's/.* ([0-9]+) insertion.*/\1/p' <<<"$stat")"

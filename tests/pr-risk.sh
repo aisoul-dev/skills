@@ -80,10 +80,112 @@ out="$(PR_BASE=main PR_RISK_SENSITIVE='app/components/flag' bash "$FACTS" risky)
 has "$out" '**project-sensitive**: `app/components/flag.ts`'
 
 out="$(bash "$FACTS" --squash "$(git rev-parse risky)")"
-has "$out" 'against its parent'
+has "$out" 'against its first parent'
 has "$out" '**Destructive data operations**'
 
 out="$(bash "$FACTS" clean 2>&1 || true)"
 has "$out" 'origin/HEAD not set, fell back to main'
+
+# --- merged PRs: a merge commit, and an empty range with a hint ---------------
+git checkout -q main
+git merge -q --no-ff -m "merge risky" risky
+out="$(bash "$FACTS" --squash "$(git rev-parse main)")"
+has "$out" 'merge commit'
+has "$out" '**Destructive data operations**'
+out="$(PR_BASE=main bash "$FACTS" risky)"
+has "$out" '- Diff: **empty**'
+has "$out" 'PR_BASE=<base sha>'
+out="$(PR_BASE="$(git rev-parse main^1)" bash "$FACTS" risky)"
+has "$out" '**Destructive data operations**'
+
+SIZE="$ROOT/plugins/aisoul/scripts/pr/size.sh"
+out="$(bash "$SIZE" --squash "$(git rev-parse main)")"
+grep -qE 'shape: (small|large)' <<<"$out" || fail "size.sh --squash on a merge commit: $out"
+grep -q ' 0 files' <<<"$out" && fail "size.sh counted 0 files on a merge commit"
+if out="$(PR_BASE=main bash "$SIZE" risky 2>&1)"; then fail "size.sh on an empty range must fail"; fi
+has "$out" 'empty diff'
+
+# --- precision: names, yaml, paths in front of the line, multi-line catches ---
+git checkout -q -b edges main
+mkdir -p app/composables app/services app/locales app/plugins
+for f in app/composables/useAuth.ts app/services/AuthService.ts app/author.ts app/controller.ts; do
+  printf 'export const x = 1\n' > "$f"
+done
+printf 'title: Hello\n' > app/locales/en.yaml
+printf 'export const a = 1\n' > app/plugins/datadog.ts
+cat > app/load.ts <<'EOF'
+export async function load() {
+  try {
+    await fetchItems()
+  } catch (e) {
+    console.error(e)
+  }
+  try {
+    await other()
+  } catch {
+    // ignore
+  }
+  try {
+    await third()
+  } catch (e) {
+    Sentry.captureException(e)
+  }
+  promise.catch(noop)
+}
+EOF
+printf "it.skipIf(ci)('slow', () => {})\n" > tests/edge.spec.ts
+printf 'trackError(e)\nif (myFlag("x")) {}\n' > app/custom.ts
+for i in $(seq 1 20); do echo "// @ts-ignore line $i"; done > app/escapes.ts
+mkdir -p "app/my dir" && printf 'export const y = 2\n' > "app/my dir/file one.ts"
+git add -A && git commit -qm edges
+
+out="$(PR_BASE=main bash "$FACTS" edges)"
+# Exactly these two: not app/author.ts, not app/controller.ts.
+grep -qxF -- '- **auth and access**: `app/composables/useAuth.ts`, `app/services/AuthService.ts`' <<<"$out" \
+  || fail "auth line should list exactly useAuth.ts and AuthService.ts: $(grep 'auth and access' <<<"$out")"
+hasnt "$out" '**infra and CI**'
+hasnt "$out" 'datadog.ts:+'
+has "$out" 'app/load.ts:+  } catch (e) {'
+has "$out" 'app/load.ts:+  } catch {'
+has "$out" 'app/load.ts:+  promise.catch(noop)'
+has "$out" "tests/edge.spec.ts:+it.skipIf(ci)('slow', () => {})"
+has "$out" '... and 5 more'
+has "$out" '`app/my dir/file one.ts`'
+# The catch that reports to Sentry is not quiet.
+[ "$(grep -c 'app/load.ts:+  } catch' <<<"$out")" = 2 ] || fail "the reporting catch must not be listed as quiet"
+
+out="$(PR_BASE=main PR_RISK_REPORTING='trackError' PR_RISK_FLAGS='myFlag' bash "$FACTS" edges)"
+has "$out" 'app/custom.ts:+trackError(e)'
+has "$out" 'app/custom.ts:+if (myFlag("x")) {}'
+
+out="$(PR_BASE=main PR_RISK_EXCLUDE=$'app/load\\.ts\napp/escapes' bash "$FACTS" edges)"
+has "$out" '- Code signals exclude: app/load\.ts, app/escapes'
+hasnt "$out" 'app/load.ts:+'
+hasnt "$out" '@ts-ignore'
+has "$out" "tests/edge.spec.ts:+it.skipIf"
+
+# --- risk-check.sh: the skill's own example passes, broken ones fail ----------
+CHECK="$ROOT/plugins/aisoul/scripts/pr/risk-check.sh"
+awk '/^```markdown$/ { i = 1; next } i && /^```$/ { exit } i' "$ROOT/plugins/aisoul/skills/pr-risk/SKILL.md" > risk-example.md
+[ -s risk-example.md ] || fail "could not extract the example from pr-risk SKILL.md"
+bash "$CHECK" risk-example.md >/dev/null || fail "the skill's own example fails risk-check.sh"
+
+{
+  echo '**Merge risk: medium**: no rule given'
+  echo
+  echo '**Blast radius** 👀'
+  echo '- touches #12'
+  echo '**Scope fit** ✅'
+  echo '**Verification**'
+  echo '**Reversibility** ✅'
+} > risk-bad.md
+if out="$(bash "$CHECK" risk-bad.md)"; then fail "risk-bad.md should fail"; fi
+has "$out" "FAIL  first line must be"
+has "$out" "FAIL  dimension out of order: Blast radius"
+has "$out" "FAIL  no '- Lower it:' bullet under: Blast radius"
+has "$out" "FAIL  no verdict on: Verification"
+has "$out" "FAIL  expected 5 dimensions, found 4"
+has "$out" "FAIL  no **Not assessed:** line"
+has "$out" "FAIL  bare #<number>"
 
 echo "pr-risk: OK"
