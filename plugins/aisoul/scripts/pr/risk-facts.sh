@@ -11,11 +11,14 @@
 # Env:
 #   PR_BASE             base ref (default: origin/HEAD, else main)
 #   PR_RISK_SENSITIVE   extra path regexes (ERE, one per line) marked sensitive
-#   PR_RISK_EXCLUDE     path regexes (ERE, one per line) left out of the code
-#                       signals, e.g. test fixtures; test sections still see them
+#   PR_RISK_EXCLUDE     path regexes (ERE, one per line) left out of every
+#                       signal, e.g. test fixtures. Markdown and plain-text
+#                       files are always left out of the signals: they are prose.
 #   PR_RISK_REPORTING   extra error-reporting call names, '|'-separated (ERE)
 #   PR_RISK_FLAGS       extra feature-flag call names, '|'-separated (ERE)
 #   PR_RISK_MAX         lines shown per signal before "and N more" (default 15)
+#
+# Exit: 0 with facts, 2 when the range is empty (the message says what to pass).
 set -euo pipefail
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
@@ -61,7 +64,7 @@ CATEGORIES=(
 )
 if [ -n "${PR_RISK_SENSITIVE:-}" ]; then
   while IFS= read -r re; do
-    [ -n "$re" ] && CATEGORIES+=("project-sensitive|$re")
+    [ -n "$re" ] && CATEGORIES+=("project-sensitive \`$re\`|$re")
   done <<<"$PR_RISK_SENSITIVE"
 fi
 
@@ -70,16 +73,18 @@ REPORTING='Sentry\.|captureException|captureMessage|reportError|logger\.(error|f
 FLAGS='feature[_-]?flag|featureFlag|isFeatureEnabled|isEnabled\(|useFeature|useFlag|getFlag|unleash|launchdarkly|growthbook'
 [ -n "${PR_RISK_FLAGS:-}" ] && FLAGS="$FLAGS|$PR_RISK_FLAGS"
 
-files="$(git diff --name-status "${range[@]}")"
-diff0="$(git diff -U0 "${range[@]}")"
-stat="$(git diff --shortstat "${range[@]}")"
+# core.quotePath=false keeps non-ASCII paths readable instead of quoted and escaped.
+gd() { git -c core.quotePath=false diff "$@"; }
+files="$(gd --name-status "${range[@]}")"
+diff0="$(gd -U0 "${range[@]}")"
+stat="$(gd --shortstat "${range[@]}")"
 
 echo "# Merge-risk facts"
 echo
 echo "- Range: $label"
 if [ -z "$stat" ]; then
   echo "- Diff: **empty**. If this PR is already merged, the base has moved past it: pass its base, \`PR_BASE=<base sha> risk-facts.sh <head sha>\`, or its merge commit, \`risk-facts.sh --squash <merge sha>\`."
-  exit 0
+  exit 2
 fi
 echo "- Diff: ${stat# }"
 [ -n "${PR_RISK_EXCLUDE:-}" ] && echo "- Code signals exclude: $(grep -v '^$' <<<"$PR_RISK_EXCLUDE" | paste -sd, - | sed 's/,/, /g')"
@@ -96,12 +101,13 @@ lines="$(awk '
   /^-/ { print f ":" $0 }
 ' <<<"$diff0")"
 
-# Lines whose path matches PR_RISK_EXCLUDE are left out of the code signals.
-code_lines="$lines"
-if [ -n "${PR_RISK_EXCLUDE:-}" ]; then
-  excl="$(grep -v '^$' <<<"$PR_RISK_EXCLUDE" | paste -sd'|' -)"
-  code_lines="$(awk -v re="^($excl)" '{ p = $0; sub(/:[-+].*/, "", p); if (p !~ re) print }' <<<"$lines")"
-fi
+# Signals read code only: prose files and paths matching PR_RISK_EXCLUDE are left out.
+excl="$(grep -v '^$' <<<"${PR_RISK_EXCLUDE:-}" | paste -sd'|' - || true)"
+code_lines="$(awk -v ex="$excl" '{
+  p = $0; sub(/:[-+].*/, "", p)
+  if (p ~ /\.(md|mdx|markdown|txt|rst)$/ || (ex != "" && p ~ ("^(" ex ")"))) next
+  print
+}' <<<"$lines")"
 added="$(grep -E '^[^:]+:\+' <<<"$code_lines" || true)"
 removed="$(grep -E '^[^:]+:-' <<<"$code_lines" || true)"
 
@@ -190,8 +196,7 @@ section "Added error reporting" "$(hits "$REPORTING" "$added")"
 section "Added type or lint escapes" "$(hits '@ts-ignore|@ts-expect-error|as any\b|eslint-disable' "$added")"
 section "Destructive data operations" "$(hits 'DROP[[:space:]]+(TABLE|COLUMN|INDEX)|ALTER[[:space:]]+TABLE.*DROP|TRUNCATE|DELETE[[:space:]]+FROM|dropTable|dropColumn|removeColumn' "$added")"
 section "Feature flags" "$(hits "$FLAGS" "$code_lines")"
-# Test sections see every changed line, excluded paths included.
-section "Skipped or removed tests" "$( { grep -E '^[^:]+:\+.*\b(it|test|describe)\.(skip|skipIf|todo|only|fails)\b' <<<"$lines" || true; grep -E '^[^:]*(\.(spec|test)\.[cm]?[jt]sx?|_test\.go|_spec\.rb):-.*\b(it|test)\(' <<<"$lines" || true; } | head -n "$MAX")"
+section "Skipped or removed tests" "$( { grep -E '^[^:]+:\+.*\b(it|test|describe)\.(skip|skipIf|todo|only|fails)\b' <<<"$code_lines" || true; grep -E '^[^:]*(\.(spec|test)\.[cm]?[jt]sx?|_test\.go|_spec\.rb):-.*\b(it|test)\(' <<<"$code_lines" || true; } | head -n "$MAX")"
 
 deleted_tests="$(awk -F'\t' '$1 == "D" { print $NF }' <<<"$files" | grep -E '\.(spec|test)\.|(^|/)(tests?|__tests__|e2e)/' || true)"
 section "Deleted test files" "$deleted_tests"

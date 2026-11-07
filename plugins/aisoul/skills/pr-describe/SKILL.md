@@ -34,10 +34,10 @@ Tables carry before/after numbers, fenced blocks carry literal output and reques
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/size.sh" <branch>            # a branch, compared with the base
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/size.sh" --squash <sha>      # a squash-merged commit
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/size.sh" --squash <sha>      # a squash or merge commit, against its first parent
 ```
 
-It counts changed lines without the excluded paths (`PR_EXCLUDE` and `PR_BASE` override them) and prints the shape. Tests count. The "~" below is for the writer; the scripts are exact: `size.sh` splits at 50 lines, `check.sh` enforces 150 and 400 words.
+It counts changed lines without the excluded paths (`PR_EXCLUDE` and `PR_BASE` override them) and prints the shape. It exits 2 on an empty range, which means the branch is already in the base: pass the PR's base sha as `PR_BASE`. Tests count. The "~" below is for the writer; the scripts are exact: `size.sh` splits at 50 lines, `check.sh` enforces 150 and 400 words.
 
 | Diff | Shape | Words outside `<details>` |
 |------|-------|---------------------------|
@@ -76,7 +76,7 @@ Name the two sides of a comparison by commit: the merge base (`git merge-base <b
 
 **Live environment.** When the automated tests mock an external dependency (an API, a database, a payment provider), the defects that matter surface only when the branch runs against the real thing. When it was run that way, name the scenarios and the defects that run caught; a fix for something that would have shipped broken is labelled as such. When it was not run, the **Not checked** line says so: silence reads as "verified". The overlay names the environment. If the tests mock nothing, the rule does not apply and nothing is said.
 
-**Checks tab.** Everything the overlay lists under Checks tab shows its own result on the PR. One of them appears in the description only when it is what the change is about (a lint-count PR, a CI change: then its before/after output is the evidence) or its result will differ from what Checks shows, such as a pre-existing failure, with the reason inline.
+**Checks tab.** Everything the overlay lists under Checks tab shows its own result on the PR. When the PR is not open or not pushed yet, those jobs have not run on it: local passes are not listed, and **Not checked** says CI has not run. One of them appears in the description only when it is what the change is about (a lint-count PR, a CI change: then its before/after output is the evidence) or its result will differ from what Checks shows, such as a pre-existing failure, with the reason inline.
 
 ## Evidence beats adjectives
 

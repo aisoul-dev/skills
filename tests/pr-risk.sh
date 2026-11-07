@@ -77,7 +77,7 @@ hasnt "$out" 'ev/null'
 
 # --- overlay extras and squash mode -------------------------------------------
 out="$(PR_BASE=main PR_RISK_SENSITIVE='app/components/flag' bash "$FACTS" risky)"
-has "$out" '**project-sensitive**: `app/components/flag.ts`'
+has "$out" '**project-sensitive `app/components/flag`**: `app/components/flag.ts`'
 
 out="$(bash "$FACTS" --squash "$(git rev-parse risky)")"
 has "$out" 'against its first parent'
@@ -92,7 +92,7 @@ git merge -q --no-ff -m "merge risky" risky
 out="$(bash "$FACTS" --squash "$(git rev-parse main)")"
 has "$out" 'merge commit'
 has "$out" '**Destructive data operations**'
-out="$(PR_BASE=main bash "$FACTS" risky)"
+out="$(PR_BASE=main bash "$FACTS" risky)" && fail "an empty range must exit non-zero"
 has "$out" '- Diff: **empty**'
 has "$out" 'PR_BASE=<base sha>'
 out="$(PR_BASE="$(git rev-parse main^1)" bash "$FACTS" risky)"
@@ -163,6 +163,19 @@ has "$out" '- Code signals exclude: app/load\.ts, app/escapes'
 hasnt "$out" 'app/load.ts:+'
 hasnt "$out" '@ts-ignore'
 has "$out" "tests/edge.spec.ts:+it.skipIf"
+out="$(PR_BASE=main PR_RISK_EXCLUDE='tests/' bash "$FACTS" edges)"
+hasnt "$out" 'tests/edge.spec.ts:+'
+
+# Prose is never a signal; non-ASCII paths keep their own lines.
+git checkout -q -b prose main
+printf 'Call Sentry.captureException and useFeature in docs.\n' > notes.md
+printf 'export const b = 2\n' > app/b.ts
+printf 'try { a() } catch (e) {}\n' > "app/Ünï.ts"
+git add -A && git commit -qm prose
+out="$(PR_BASE=main bash "$FACTS" prose)"
+hasnt "$out" 'notes.md:+'
+has "$out" 'app/Ünï.ts:+try { a() } catch (e) {}'
+hasnt "$out" 'app/b.ts:+try'
 
 # --- risk-check.sh: the skill's own example passes, broken ones fail ----------
 CHECK="$ROOT/plugins/aisoul/scripts/pr/risk-check.sh"

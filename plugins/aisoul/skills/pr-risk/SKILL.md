@@ -14,17 +14,18 @@ Two modes:
 
 ## 0. Load the project overlay
 
-If the repository has `.claude/aisoul/pr-risk.md`, read it first; it replaces the defaults below. A template is at `${CLAUDE_PLUGIN_ROOT}/skills/pr-risk/overlay-template.md`.
+If the repository has `.claude/aisoul/pr-risk.md`, read it first. Path and API lists it gives are added to the built-in ones; other values replace the default; anything it does not mention keeps the default. A template is at `${CLAUDE_PLUGIN_ROOT}/skills/pr-risk/overlay-template.md`.
 
 | Key | Default |
 |-----|---------|
 | Base branch | `origin/HEAD`, else `main` |
 | Sensitive paths | the built-in categories in `risk-facts.sh`: auth and access, money, secrets and security config, data and schema, infra and CI, dependencies |
-| Excluded from code signals | nothing |
+| Excluded from code signals | nothing beyond prose: Markdown and plain-text files never produce signals |
 | Error reporting | common APIs (`Sentry.*`, `captureException`, `reportError`, `logger.error`, ...) |
 | Feature flags | common APIs (`isFeatureEnabled`, `useFeature`, `useFlag`, ...) |
 | Rollback | revert the merge commit and release as usual; nothing else assumed |
 | Runtime | a deployed service whose errors can be reported |
+| Verification evidence | CI check runs for the head, the PR description's Evidence section, output attached to the PR |
 
 ## 1. Gather
 
@@ -41,9 +42,9 @@ Facts first, judgement after.
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/risk-facts.sh" <head>
    ```
 
-   `risk-facts.sh` lists changed files, sensitive-path hits by category, and signals in the changed lines: swallowed errors, catch blocks that only log, error reporting added or removed, type and lint escapes, destructive data operations, feature flags, skipped, removed or deleted tests. It is grep, not judgement: every hit is a lead to read, not a finding. Both scripts say so when the range is empty; never assess an empty range.
+   `risk-facts.sh` lists changed files, sensitive-path hits by category, and signals in the changed lines: swallowed errors, catch blocks that only log, error reporting added or removed, type and lint escapes, destructive data operations, feature flags, skipped, removed or deleted tests. It is grep, not judgement: every hit is a lead to read, not a finding. Both scripts exit 2 with a hint when the range is empty; never assess an empty range.
 3. **Intent.** The PR description, the linked issue or ticket, and the commit messages. If none states intent, Scope fit is judged on what is there and says so.
-4. **Proof.** CI results for the head commit (`gh api repos/<owner>/<repo>/commits/<sha>/check-runs`), the description's Evidence section and **Not checked:** line if it was written with `/aisoul:pr-describe`, and any output attached to the PR. A result the description reports counts when CI or attached output shows it, or when you reproduce it cheaply; otherwise it is "reported, not reproduced" and cannot carry a ✅ alone.
+4. **Proof.** CI results for the head commit (`gh api repos/<owner>/<repo>/commits/<sha>/check-runs`; a 422 or an empty list means the head is not pushed or CI has not run, which goes under **Not assessed**), the description's Evidence section and **Not checked:** line if it was written with `/aisoul:pr-describe`, and any output attached to the PR. A result the description reports counts when CI or attached output shows it, or when you reproduce it cheaply; otherwise it is "reported, not reproduced" and cannot carry a ✅ alone.
 5. **Read the code** behind every lead and every sensitive path. A finding cites `file:line`.
 
 ## 2. Judge five dimensions

@@ -21,6 +21,15 @@ app/plugins/auth
 server/api/admin/
 ```
 
+## Excluded from code signals
+
+Paths (extended regex, one per line) whose changed lines produce no signals,
+passed as `PR_RISK_EXCLUDE`. Markdown and plain-text files are always excluded.
+
+```text
+tests/fixtures/
+```
+
 ## Error reporting
 
 Calls that report errors in this project, passed as `PR_RISK_REPORTING`:
@@ -45,6 +54,12 @@ How a bad merge is undone here, and what a revert does not undo:
 
 - Revert on `main`, then the next release tag; a release takes about 30 minutes.
 - Database migrations run on deploy and are not reverted automatically: any migration is a one-way door until a down migration is written and tested.
+
+## Runtime
+
+Where the code runs and what "someone finds out" means there, e.g. a deployed
+service reporting to Sentry, or a CLI that must fail with a non-zero exit and a
+clear message.
 
 ## Verification evidence
 
