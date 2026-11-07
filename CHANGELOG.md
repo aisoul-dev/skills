@@ -2,6 +2,12 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.3.0 (2026-11-07)
+
+### pr
+- `pr-review`: a review that ends in a verdict a reviewer can act on. Scope against the remote base (stop on conflicts), a bug hunt, context checks before any status (verify in code, stacked branches, pre-existing, reachable on the base, feature flags, contract source, changed test expectations, duplication), mechanical gates and ratchets, the merge risk from `pr-risk`, triage with proof for every Blocker, a ledger of every finding, and paste-ready comments with links and placement lines. Own-branch mode returns a fix list instead. Project specifics in `.claude/aisoul/pr-review.md`.
+- `scripts/pr/`: `scope.sh`, `stacked.sh`, `ratchet.sh`, `changed-expects.sh`, `comment-link.sh`.
+
 ## 1.2.0 (2026-11-07)
 
 ### pr
