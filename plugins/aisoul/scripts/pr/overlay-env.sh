@@ -10,6 +10,8 @@
 #   Excluded from code signals   -> PR_RISK_EXCLUDE     (one regex per line)
 #   Error reporting              -> PR_RISK_REPORTING   (lines joined with |)
 #   Feature flags                -> PR_RISK_FLAGS       (lines joined with |)
+#   Spec folders                 -> PR_SPEC_DIRS        (one folder per line)
+#   Ticket pattern               -> PR_TICKET_RE        (first `inline code`)
 # Prints nothing for a missing file or section, so the defaults apply.
 set -euo pipefail
 
@@ -28,6 +30,8 @@ awk '
     else if (sec == "Excluded from code signals" && block != "") emit("PR_RISK_EXCLUDE", block)
     else if (sec == "Error reporting" && block != "") { gsub(/\n/, "|", block); emit("PR_RISK_REPORTING", block) }
     else if (sec == "Feature flags" && block != "") { gsub(/\n/, "|", block); emit("PR_RISK_FLAGS", block) }
+    else if (sec == "Spec folders" && block != "") emit("PR_SPEC_DIRS", block)
+    else if (sec == "Ticket pattern" && inline != "") emit("PR_TICKET_RE", inline)
   }
   /^## / { flush(); sec = substr($0, 4); sub(/[[:space:]]+$/, "", sec); block = ""; inline = ""; inblock = 0; done = 0; next }
   /^<!--/ { incomment = 1 }

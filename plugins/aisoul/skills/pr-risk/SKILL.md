@@ -44,7 +44,7 @@ Facts first, judgement after.
    ```
 
    `risk-facts.sh` lists changed files, sensitive-path hits by category, and signals in the changed lines: swallowed errors, catch blocks that only log, error reporting added or removed, type and lint escapes, destructive data operations, feature flags, skipped, removed or deleted tests. It is grep, not judgement: every hit is a lead to read, not a finding. Both scripts exit 2 with a hint when the range is empty; never assess an empty range.
-3. **Intent.** The PR description, the linked issue or ticket, and the commit messages. If none states intent, Scope fit is judged on what is there and says so.
+3. **Intent.** The PR description, the linked issue or ticket, the commit messages, and the spec when one exists (`bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/spec-find.sh" <head>` lists candidates). Scope fit is judged against the spec first. If nothing states intent, Scope fit is judged on what is there and says so.
 4. **Proof.** CI results for the head commit (`gh api repos/<owner>/<repo>/commits/<sha>/check-runs`; a 422 or an empty list means the head is not pushed or CI has not run, which goes under **Not assessed**), the description's Evidence section and **Not checked:** line if it was written with `/aisoul:pr-describe`, and any output attached to the PR. A result the description reports counts when CI or attached output shows it, or when you reproduce it cheaply; otherwise it is "reported, not reproduced" and cannot carry a ✅ alone.
 5. **Read the code** behind every lead and every sensitive path. A finding cites `file:line`.
 

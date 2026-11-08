@@ -53,7 +53,7 @@ Overall risk comes from explicit rules (a one-way door on anything but an isolat
 
 Use it as a review aid (chat, or a PR comment when asked) or as a self-check before asking for review: pair it with `pr-describe`, whose Evidence section is what Verification reads.
 
-`/aisoul:pr-review` turns a review into a decision. Findings from a bug hunt are not rated until context checks have run on them: verified in the code, checked against stacked branches, against the base (pre-existing, reachable), against feature flags and the contract source, against changed test expectations and duplication. A finding is a Blocker only if this branch introduced it, nothing stacked handles it, it is a broken valid-input flow, data loss, a security issue, a red gate or an architectural violation, and it can be shown to fail. The reply is a verdict with the merge risk from `pr-risk`, gate results, a ledger of every finding with its status, and paste-ready comments whose links and placement lines come from `comment-link.sh`.
+`/aisoul:pr-review` turns a review into a decision. It checks the change against its spec (found by `spec-find.sh`: ticket references, spec files the branch changes or names, then the user), takes findings from the bug hunt and, when installed, a standards review, and rates none of them until context checks have run on them: verified in the code, checked against stacked branches, against the base (pre-existing, reachable), against feature flags and the contract source, against changed test expectations and duplication. A finding is a Blocker only if this branch introduced it, nothing stacked handles it, it is a broken valid-input flow, data loss, a security issue, a red gate or an architectural violation, and it can be shown to fail. The reply is a verdict with the merge risk from `pr-risk`, gate results, a ledger of every finding with its status, and paste-ready comments whose links and placement lines come from `comment-link.sh`.
 
 | Script | What it does |
 |--------|--------------|
@@ -62,6 +62,7 @@ Use it as a review aid (chat, or a PR comment when asked) or as a self-check bef
 | `ratchet.sh '<ERE>' [branch] [-- pathspec]` | a pattern added vs removed; exit 0 down, 1 even, 2 up |
 | `changed-expects.sh [branch]` | test assertions the branch changed or removed, not just added |
 | `comment-link.sh <path> <line> [end] [branch]` | link at the pushed commit and the placement line GitHub will accept |
+| `spec-find.sh [branch]` | ticket and issue references, and candidate spec files: changed by the branch, naming a ticket, sharing words with the branch name (`PR_SPEC_DIRS`, `PR_TICKET_RE`); exit 1 with none |
 
 Overlay: `skills/pr-review/overlay-template.md` to `.claude/aisoul/pr-review.md`: gates, ratchets, constraints, feature flags, where the API contract lives, the own-branch handoff, comment language and a disclosure line.
 
@@ -109,5 +110,5 @@ Nothing is installed into the audited project and no config is written there.
 
 - **untangle**: inspired by [caldoai/skills `untangle-codebase`](https://github.com/caldoai/skills) (MIT). The taxonomy, metrics, scripts and workflow here are independent. Background reading is listed at the end of the audit skill.
 - **pr-describe**: ideas taken from Hugo RCD's [What my pull requests look like now](https://hugorcd.com/writing/what-my-pull-requests-look-like-now): evidence chosen by change type, an order the reader can stop at, "before" from the base branch, demo data only, one line on what was not checked. The size rule, word budgets, scripts and overlay are ours.
-- **pr-review**: generalised from the author's own project review skill; every project-specific value moved to the overlay.
+- **pr-review**: generalised from the author's own project review skill; every project-specific value moved to the overlay. The Spec check's search order and its three kinds of spec findings come from Matt Pocock's [`code-review`](https://github.com/mattpocock/skills) (MIT), which `pr-review` can also run as its standards review.
 - **pr-risk**: inspired by Warp's [`merge-risk`](https://github.com/warpdotdev/common-skills) (MIT), which credits Matt Pocock's `pr` skill. The idea of rating alignment, impact, verification, rollback cost and error detection comes from there; the wording, the rule-based overall risk, the "Lower it" actions, the self-check mode, the facts script and the overlay are ours.

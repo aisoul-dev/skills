@@ -2,6 +2,15 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.4.0 (2026-11-08)
+
+### pr
+- `pr-review`: a Spec check. It finds the spec (references in the branch and commits, spec files the branch changes or names, then the user) and reports missing or partial, wrong, and unasked behaviour, each quoting the spec line; missing and wrong can be Blockers. With no spec it says so and invents nothing.
+- `pr-review`: the bug hunt is the built-in `/code-review`; when a plugin skill shares the name, or the one found is not a bug hunt, it asks instead of guessing. A standards review skill, when installed, is a second source of findings (source `standards`).
+- `pr-review`: every subagent brief forbids invoking review skills, so subagents never start another review.
+- `pr-risk`: Scope fit is judged against the spec when one exists.
+- `scripts/pr/spec-find.sh`, with tests; `overlay-env.sh` reads Spec folders and Ticket pattern.
+
 ## 1.3.0 (2026-11-07)
 
 ### pr

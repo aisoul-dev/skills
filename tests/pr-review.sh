@@ -122,4 +122,43 @@ git checkout -q main
 out="$(PR_BASE=origin/main bash "$S/stacked.sh" origin/follow)"
 has "$out" '- none'
 
+# --- spec-find: references, changed specs, ticket names, words, nothing ------
+SF="$S/spec-find.sh"
+git checkout -q main
+mkdir -p docs/specs docs/superpowers/specs
+printf '# Checkout\n' > docs/specs/SHOP-77-checkout.md
+printf '# Search filters\n' > docs/superpowers/specs/search-filters.md
+printf '# Unrelated\n' > docs/specs/billing-export.md
+git add -A && git commit -qm specs && git push -q origin main
+
+git checkout -q -b story/SHOP-77-guest-checkout main
+printf 'x\n' > app/checkout.ts && git add -A && git commit -qm "Guest checkout" -m "Closes #12"
+out="$(PR_BASE=main bash "$SF" story/SHOP-77-guest-checkout)"
+has "$out" '- ticket `SHOP-77`'
+has "$out" '- issue `Closes #12`'
+grep -A2 'naming a ticket' <<<"$out" | grep -qF -- '- `docs/specs/SHOP-77-checkout.md`' || fail "spec naming the ticket not listed"
+
+git checkout -q -b story/search-filters-panel main
+printf '# Search filters panel\n' > docs/specs/search-filters-panel.md
+printf 'y\n' > app/search.ts && git add -A && git commit -qm "Filters panel"
+out="$(PR_BASE=main bash "$SF" story/search-filters-panel)"
+grep -A2 'changed by the branch' <<<"$out" | grep -qF -- '- `docs/specs/search-filters-panel.md`' || fail "spec the branch adds not listed"
+has "$out" '`docs/superpowers/specs/search-filters.md` (2 matching words)'
+hasnt "$out" 'billing-export.md'
+
+git checkout -q -b fix/zzz main
+printf 'z\n' > app/z2.ts && git add -A && git commit -qm "Tweak"
+if PR_BASE=main bash "$SF" fix/zzz >/dev/null; then fail "no candidates must exit 1"; fi
+
+out="$(PR_BASE=main PR_SPEC_DIRS='nothing-here' bash "$SF" story/SHOP-77-guest-checkout || true)"
+hasnt "$out" 'SHOP-77-checkout.md'
+git checkout -q -b story/abc-1850-thing main
+printf 'q\n' > app/q.ts && git add -A && git commit -qm "Thing"
+out="$(PR_BASE=main PR_TICKET_RE='[Aa][Bb][Cc]-[0-9]+' bash "$SF" story/abc-1850-thing || true)"
+has "$out" '- ticket `abc-1850`'
+
+out="$(bash "$S/overlay-env.sh" "$ROOT/plugins/aisoul/skills/pr-review/overlay-template.md")"
+has "$out" "export PR_SPEC_DIRS='docs/specs'"
+has "$out" "export PR_TICKET_RE='[A-Z]+-[0-9]+'"
+
 echo "pr-review: OK"

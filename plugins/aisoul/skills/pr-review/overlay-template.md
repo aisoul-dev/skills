@@ -12,7 +12,23 @@ need and the default applies. Keep the headings as they are.
 
 ## Bug hunt
 
-The `code-review` skill with args `xhigh origin/main`, unless the user names another level.
+Claude Code's built-in `/code-review` with args `xhigh origin/main`, unless the user names another level. Not a plugin skill that shares the name.
+
+## Standards review
+
+`code-review` from `mattpocock/skills`, with `origin/main` as its fixed point. Delete this section for none.
+
+## Spec folders
+
+Where specs live, one folder per line, passed as `PR_SPEC_DIRS`:
+
+```text
+docs/specs
+```
+
+## Ticket pattern
+
+`[A-Z]+-[0-9]+`
 
 ## Gates
 
