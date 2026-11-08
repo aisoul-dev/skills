@@ -6,7 +6,13 @@
 
 ## Bug hunt
 
-The `code-review` skill with args `xhigh origin/main` when available; otherwise the skill's own hunt.
+Claude Code's built-in `/code-review` with args `xhigh origin/main` when available; otherwise the skill's own hunt.
+
+## Spec folders
+
+```text
+docs/specs
+```
 
 ## Gates
 

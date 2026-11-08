@@ -122,4 +122,74 @@ git checkout -q main
 out="$(PR_BASE=origin/main bash "$S/stacked.sh" origin/follow)"
 has "$out" '- none'
 
+# --- spec-find: references, changed specs, ticket names, words, nothing ------
+SF="$S/spec-find.sh"
+git checkout -q main
+mkdir -p docs/specs docs/superpowers/specs
+printf '# Checkout\n' > docs/specs/SHOP-77-checkout.md
+printf '# Search filters\n' > docs/superpowers/specs/search-filters.md
+printf '# Unrelated\n' > docs/specs/billing-export.md
+git add -A && git commit -qm specs && git push -q origin main
+
+git checkout -q -b story/SHOP-77-guest-checkout main
+printf 'x\n' > app/checkout.ts && git add -A && git commit -qm "Guest checkout" -m "Closes #12"
+out="$(PR_BASE=main bash "$SF" story/SHOP-77-guest-checkout)"
+has "$out" '- ticket `SHOP-77`'
+has "$out" '- issue `Closes #12`'
+grep -A2 'naming a ticket' <<<"$out" | grep -qF -- '- `docs/specs/SHOP-77-checkout.md`' || fail "spec naming the ticket not listed"
+
+git checkout -q -b story/search-filters-panel main
+printf '# Search filters panel\n' > docs/specs/search-filters-panel.md
+printf 'y\n' > app/search.ts && git add -A && git commit -qm "Filters panel"
+out="$(PR_BASE=main bash "$SF" story/search-filters-panel)"
+grep -A2 'changed by the branch' <<<"$out" | grep -qF -- '- `docs/specs/search-filters-panel.md`' || fail "spec the branch adds not listed"
+has "$out" '`docs/superpowers/specs/search-filters.md` (2 matching words)'
+hasnt "$out" 'billing-export.md'
+
+git checkout -q -b fix/zzz main
+printf 'z\n' > app/z2.ts && git add -A && git commit -qm "Tweak"
+if PR_BASE=main bash "$SF" fix/zzz >/dev/null; then fail "no candidates must exit 1"; fi
+
+out="$(PR_BASE=main PR_SPEC_DIRS='nothing-here' bash "$SF" story/SHOP-77-guest-checkout || true)"
+hasnt "$out" 'SHOP-77-checkout.md'
+git checkout -q -b story/abc-1850-thing main
+printf 'q\n' > app/q.ts && git add -A && git commit -qm "Thing"
+out="$(PR_BASE=main PR_TICKET_RE='[Aa][Bb][Cc]-[0-9]+' bash "$SF" story/abc-1850-thing || true)"
+has "$out" '- ticket `abc-1850`'
+
+# spec-find: review findings (subdirectory, non-ASCII, empty range, sha,
+# ticket prefix, folder words, invalid pattern, standards)
+git checkout -q -b story/zahlung main
+printf '# Zahlung\n' > "docs/specs/zahlungsübersicht.md"
+printf 'u\n' > app/u.ts && git add -A && git commit -qm "UTF-8 and SHA-256 handling"
+out="$(cd app && PR_BASE=main bash "$SF" story/zahlung)"
+grep -A2 'changed by the branch' <<<"$out" | grep -qF -- '- `docs/specs/zahlungsübersicht.md`' \
+  || fail "spec with a non-ASCII name, run from a subdirectory, not listed: $out"
+hasnt "$out" 'ticket `UTF-8`'
+hasnt "$out" 'ticket `SHA-256`'
+
+set +e; out="$(PR_BASE=main bash "$SF" main 2>&1)"; code=$?; set -e
+[ "$code" = 2 ] || fail "an empty range must exit 2, got $code"
+has "$out" 'Empty range'
+
+out="$(PR_BASE=main bash "$SF" "$(git rev-parse story/zahlung)")"
+has "$out" '- skipped:'
+
+git checkout -q -b story/SHOP-7-small main
+printf 's\n' > app/s.ts && git add -A && git commit -qm small
+out="$(PR_BASE=main bash "$SF" story/SHOP-7-small || true)"
+grep -A2 'naming a ticket' <<<"$out" | grep -qF 'SHOP-77' && fail "SHOP-7 must not name SHOP-77's spec"
+
+git checkout -q -b story/specs-loader main
+printf 'l\n' > app/l.ts && git add -A && git commit -qm loader
+out="$(PR_BASE=main bash "$SF" story/specs-loader || true)"
+hasnt "$out" 'SHOP-77-checkout.md` ('
+
+set +e; PR_BASE=main PR_TICKET_RE='[' bash "$SF" story/zahlung >/dev/null 2>&1; code=$?; set -e
+[ "$code" = 2 ] || fail "an invalid PR_TICKET_RE must exit 2, got $code"
+
+out="$(bash "$S/overlay-env.sh" "$ROOT/plugins/aisoul/skills/pr-review/overlay-template.md")"
+has "$out" "export PR_SPEC_DIRS='docs/specs'"
+has "$out" "export PR_TICKET_RE='[A-Z][A-Z0-9]+-[0-9]+'"
+
 echo "pr-review: OK"
