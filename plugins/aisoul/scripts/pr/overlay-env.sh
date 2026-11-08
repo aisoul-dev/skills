@@ -3,8 +3,8 @@
 #
 #   eval "$(bash overlay-env.sh .claude/aisoul/pr-risk.md)"
 #
-# Reads, per "## <Heading>" section, the first ```text block (or, for the base,
-# the first `inline code`):
+# Reads, per "## <Heading>" section, the first ```text block (or, for the base
+# and the ticket pattern, the first `inline code`):
 #   Base / Base branch           -> PR_BASE
 #   Sensitive paths              -> PR_RISK_SENSITIVE   (one regex per line)
 #   Excluded from code signals   -> PR_RISK_EXCLUDE     (one regex per line)

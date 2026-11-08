@@ -9,7 +9,8 @@ Versions of the `aisoul` plugin, newest first. Semver: major for breaking change
 - `pr-review`: the bug hunt is the built-in `/code-review`; when a plugin skill shares the name, or the one found is not a bug hunt, it asks instead of guessing. A standards review skill, when installed, is a second source of findings (source `standards`).
 - `pr-review`: every subagent brief forbids invoking review skills, so subagents never start another review.
 - `pr-risk`: Scope fit is judged against the spec when one exists.
-- `scripts/pr/spec-find.sh`, with tests; `overlay-env.sh` reads Spec folders and Ticket pattern.
+- The reply carries one line per spec (`Spec: ...: R1 met, R2 partial`), and says under Not checked which bug hunt ran and when no standards review did.
+- `scripts/pr/spec-find.sh`, with tests: works from any subdirectory and with non-ASCII names, exits 2 on an empty range or an invalid ticket pattern, matches whole tickets only, scores branch words against file names, ignores standards such as UTF-8 in the default pattern. `overlay-env.sh` reads Spec folders and Ticket pattern.
 
 ## 1.3.0 (2026-11-07)
 

@@ -56,5 +56,6 @@ else
   shape="large"; budget=400
 fi
 
-echo "$label: $files files, +$ins -$del ($total changed lines, excluded: $DEFAULT_EXCLUDE ${PR_EXCLUDE:-})"
+excluded="$DEFAULT_EXCLUDE${PR_EXCLUDE:+ $PR_EXCLUDE}"
+echo "$label: $files files, +$ins -$del ($total changed lines, excluded: ${excluded})"
 echo "shape: $shape (up to ~$budget words outside <details>)"

@@ -16,7 +16,9 @@ Claude Code's built-in `/code-review` with args `xhigh origin/main`, unless the 
 
 ## Standards review
 
-`code-review` from `mattpocock/skills`, with `origin/main` as its fixed point. Delete this section for none.
+<!-- Optional. A standards and spec review skill to run as a second source, e.g.:
+`code-review` from `mattpocock/skills`, with `origin/main` as its fixed point.
+Leave this comment alone or delete the section for none. -->
 
 ## Spec folders
 
@@ -28,7 +30,7 @@ docs/specs
 
 ## Ticket pattern
 
-`[A-Z]+-[0-9]+`
+`[A-Z][A-Z0-9]+-[0-9]+`
 
 ## Gates
 

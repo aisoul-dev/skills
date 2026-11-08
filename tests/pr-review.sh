@@ -157,8 +157,39 @@ printf 'q\n' > app/q.ts && git add -A && git commit -qm "Thing"
 out="$(PR_BASE=main PR_TICKET_RE='[Aa][Bb][Cc]-[0-9]+' bash "$SF" story/abc-1850-thing || true)"
 has "$out" '- ticket `abc-1850`'
 
+# spec-find: review findings (subdirectory, non-ASCII, empty range, sha,
+# ticket prefix, folder words, invalid pattern, standards)
+git checkout -q -b story/zahlung main
+printf '# Zahlung\n' > "docs/specs/zahlungsübersicht.md"
+printf 'u\n' > app/u.ts && git add -A && git commit -qm "UTF-8 and SHA-256 handling"
+out="$(cd app && PR_BASE=main bash "$SF" story/zahlung)"
+grep -A2 'changed by the branch' <<<"$out" | grep -qF -- '- `docs/specs/zahlungsübersicht.md`' \
+  || fail "spec with a non-ASCII name, run from a subdirectory, not listed: $out"
+hasnt "$out" 'ticket `UTF-8`'
+hasnt "$out" 'ticket `SHA-256`'
+
+set +e; out="$(PR_BASE=main bash "$SF" main 2>&1)"; code=$?; set -e
+[ "$code" = 2 ] || fail "an empty range must exit 2, got $code"
+has "$out" 'Empty range'
+
+out="$(PR_BASE=main bash "$SF" "$(git rev-parse story/zahlung)")"
+has "$out" '- skipped:'
+
+git checkout -q -b story/SHOP-7-small main
+printf 's\n' > app/s.ts && git add -A && git commit -qm small
+out="$(PR_BASE=main bash "$SF" story/SHOP-7-small || true)"
+grep -A2 'naming a ticket' <<<"$out" | grep -qF 'SHOP-77' && fail "SHOP-7 must not name SHOP-77's spec"
+
+git checkout -q -b story/specs-loader main
+printf 'l\n' > app/l.ts && git add -A && git commit -qm loader
+out="$(PR_BASE=main bash "$SF" story/specs-loader || true)"
+hasnt "$out" 'SHOP-77-checkout.md` ('
+
+set +e; PR_BASE=main PR_TICKET_RE='[' bash "$SF" story/zahlung >/dev/null 2>&1; code=$?; set -e
+[ "$code" = 2 ] || fail "an invalid PR_TICKET_RE must exit 2, got $code"
+
 out="$(bash "$S/overlay-env.sh" "$ROOT/plugins/aisoul/skills/pr-review/overlay-template.md")"
 has "$out" "export PR_SPEC_DIRS='docs/specs'"
-has "$out" "export PR_TICKET_RE='[A-Z]+-[0-9]+'"
+has "$out" "export PR_TICKET_RE='[A-Z][A-Z0-9]+-[0-9]+'"
 
 echo "pr-review: OK"

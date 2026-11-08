@@ -36,7 +36,7 @@ If the repository has `.claude/aisoul/pr-review.md`, read it first. Its values r
 | Comment language | English |
 | Disclosure | none; when set, the review summary ends with it |
 
-Scripts are in `${CLAUDE_PLUGIN_ROOT}/scripts/pr/`. All take `PR_BASE`; load the overlay's base once so every script and `pr-risk` compare against the same range:
+Scripts are in `${CLAUDE_PLUGIN_ROOT}/scripts/pr/`. All take `PR_BASE` and read the overlay's values from the environment. Each shell call starts fresh, so load the overlay at the start of every call that runs a script, and pass the same `PR_BASE` to `pr-risk`, so every script compares the same range:
 
 ```bash
 eval "$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/overlay-env.sh" .claude/aisoul/pr-review.md)"
@@ -60,37 +60,37 @@ In own-branch mode, tell the user to update from the base. Do not merge it yours
 
 ## Step 2: Find
 
-Findings come from up to two sources, each reported with its own source name in the ledger. Every subagent brief, here and in later steps, includes the line "Do not invoke any review skill (code-review, pr-review, pr-risk)": a subagent that starts its own review spawns more agents and duplicates the work.
+Findings come from up to three sources, each with its own source name in the ledger. Every subagent brief, here and in later steps, includes the line "Do not invoke any review skill (code-review, pr-review, pr-risk) unless this brief is to run that one skill": a subagent that starts its own review spawns more agents and duplicates the work.
 
 **Bug hunt** (source _bug hunt_, whoever ran it). By default, Claude Code's built-in `/code-review` with args `xhigh <base>`, unless the user named another level. Its output varies a lot from run to run: the same branch can return 15 findings once and 1 the next time.
 
-**Make sure it is the bug hunt.** Plugins can ship a skill with the same name. `code-review` from `mattpocock/skills`, for one, reviews standards and spec and does not hunt bugs, and it does not take a level. If more than one available skill answers to `code-review`, or the one that does is not a bug hunt, ask the user which to run, or use the overlay's choice. Never guess.
+**Make sure it is the bug hunt.** Plugins can ship a skill with the same name. `code-review` from `mattpocock/skills`, for one, reviews standards and spec and does not hunt bugs, and it does not take a level. If several bug hunts answer to `code-review`, ask which to run, or use the overlay's choice. If the only one is not a bug hunt, run the own hunt below, and run that skill as the standards review if it is one. Never guess. Say under _Not checked_ which hunt ran when it was not the built-in one.
 
-**Standards review** (source _standards_), when the overlay names one or one is installed: run it with the base as its fixed point. Keep its Standards findings; its Spec findings, if any, feed the Spec check in Step 3 instead of being added twice. A breach of a documented standard can become an architectural Blocker in Step 5; a code smell is always Non-blocking.
+**Standards review** (source _standards_), when the overlay names one or one is installed: run it with the base as its fixed point. Keep its Standards findings; its Spec findings, if any, feed the Spec source below instead of being added twice. If the overlay names one that is not installed, or none runs, say so under _Not checked_. A breach of a documented standard can become an architectural Blocker in Step 5; a code smell is always Non-blocking.
 
 Without a `code-review` skill, hunt yourself: read the full diff, then for each changed function the callers and the tests that reach it, and look for broken flows, unhandled states and errors, and wrong assumptions about inputs. Use subagents per area for a large diff.
+
+**Spec** (source _spec_): is it the change that was asked for?
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/spec-find.sh" [<branch>]
+```
+
+It lists ticket and issue references in the branch name and commits, and candidate spec files: ones the branch changes, ones naming a ticket, ones sharing words with the branch name (exit 1: no candidates; exit 2: empty range). Then use the first source that exists: a path the user passed, a spec file the branch changes, a ticket or issue the references point to (read it if you can reach it), another candidate that really is this branch's spec, or ask the user. With none, write "no spec available" under _Not checked_ and invent no requirements.
+
+Compare the spec with the diff, in a subagent for a large change. Number its requirements if they are not (R1, R2, ...) and judge each: met, partial, missing or wrong. Each gap becomes a finding that quotes the spec line:
+
+- **missing or partial**: a requirement the diff does not implement, or only part of it
+- **wrong**: implemented, but not as the spec says
+- **not asked for**: behaviour no requirement covers. Non-blocking; a large unasked part is also a `pr-risk` Scope fit gap
+
+Spec findings go through Step 3 and Step 5 like the others: the proof for a Blocker is the quoted spec line plus the input that shows the gap.
 
 **Anything you notice yourself in Steps 3 and 4 also goes into the ledger**: a label mismatch, a missing test, a lint warning on a line the branch added. Its source is _own_, even if the bug hunt did not report it. An observation mentioned only in passing slips through.
 
 ## Step 3: Context checks (for each finding, before assigning a status)
 
 **Verify first.** Open each finding's `path:line` and confirm the code does what the finding claims. A finding you cannot confirm in the code cannot be a Blocker: give it _Non-blocking (unconfirmed)_ and say what you could not confirm.
-
-**Spec: is it the change that was asked for?**
-
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/spec-find.sh" [<branch>]
-```
-
-It lists ticket and issue references in the branch name and commits, and candidate spec files: ones the branch changes, ones naming a ticket, ones sharing words with the branch name. Then use the first source that exists: a ticket or issue the references point to (read it if you can reach it), a path the user passed, a candidate file that really is this branch's spec, or ask the user. With none, write "no spec available" under _Not checked_ and invent no requirements.
-
-Compare the spec with the diff, in a subagent for a large change. Each finding quotes the spec line, source _spec_:
-
-- **missing or partial**: a requirement the diff does not implement, or only part of it
-- **wrong**: implemented, but not as the spec says
-- **not asked for**: behaviour no requirement covers. Non-blocking; a large unasked part is also a `pr-risk` Scope fit gap
-
-Missing and wrong findings go through Step 5 like any other: the proof is the quoted spec line plus the input that shows the gap.
 
 **Stacked follow-up: run this before the others below.**
 
@@ -132,7 +132,7 @@ It prints added, removed and net, and exits 0 (net down), 1 (even) or 2 (net up)
 
 Report each gate's own counts (files, tests, errors); when a runner prints only a pass line, quote that line. A gate is red only on errors, test failures, conflicts, or a ratchet the branch moves the wrong way. A warning about the whole repository (a validator, an audit) counts only if the base does not show it too; otherwise it is _Non-blocking (pre-existing)_. A ratchet that stays even is one Non-blocking row with source _own_, when the overlay says every PR should move it. Each line the branch added that gets lint warnings becomes one Non-blocking row, source _own_, listing every rule that fires on it.
 
-**Merge risk.** Run `/aisoul:pr-risk` in review mode on the same range (the same `PR_BASE`), reusing the gates' results as proof. Its headline goes into the verdict, its whole assessment into the reply (Step 6, part 3). Each ⚠️ dimension also becomes a ledger row with source _pr-risk_, Non-blocking unless it meets Step 5. The verdict is about defects and the risk about consequences: a high risk with no Blocker still gives **✅ Approve with comments**, and the summary's first bullet names the risk.
+**Merge risk.** Run `/aisoul:pr-risk` in review mode on the same range (the same `PR_BASE`) and with the spec chosen in Step 2, reusing the gates' results as proof. Its headline goes into the verdict, its whole assessment into the reply (Step 6, part 3). Each ⚠️ dimension also becomes a ledger row with source _pr-risk_, Non-blocking unless it meets Step 5. The verdict is about defects and the risk about consequences: a high risk with no Blocker still gives **✅ Approve with comments**, and the summary's first bullet names the risk.
 
 End-to-end runs, browser checks and CI are not run by default; read CI's state for the pushed head if `gh` is available. Anything not run goes under _Not checked_.
 
@@ -148,7 +148,7 @@ A finding is a **Blocker** only if all four hold:
    - a security issue
    - a red gate
    - **architectural**: a violated overlay constraint or documented standard, or logic placed at a layer the next ticket must undo
-   - **spec**: a requirement missing, partial or implemented wrongly, when the spec makes it part of this change
+   - **spec**: a requirement missing, partial or implemented wrongly, when the spec makes it part of this change. Condition 1 then holds: this branch is the change that owed it
 4. You can show it fails: a failing-test sketch or an exact repro (input, expected, actual). For an architectural finding, the proof is the violated constraint or the ticket that has to undo it. A red gate is its own proof. Without proof, the finding is Non-blocking, whatever its category.
 
 Everything else is **Non-blocking**. A finding the checks proved wrong is **Dismissed**, with its reason. If the bug hunt reported findings through `ReportFindings`, report them again with `outcome: no_change_needed` on the Dismissed and Handled ones.
@@ -166,8 +166,8 @@ Prose and the ledger in the user's language; comment blocks in the overlay's com
 1. **Verdict**: one line with the verdict and one sentence why, then the merge risk headline from `pr-risk`. Directly under it, the merge conditions, or `Merge conditions: none`. A condition is something that must happen with or before this merge: an update from the base, merging together with a stacked branch that handles a finding. A stacked branch that handles nothing sets no condition.
 2. **Gates**: one line per gate with its result and counts, then a _Not checked:_ line.
 3. **Merge risk**: the `pr-risk` assessment as it came out, in its own format.
-4. **Ledger, every finding**: a table `#` | source (bug hunt / _standards_ / _spec_ / _own_ / _pr-risk_) | finding | `path:line` | status (Blocker / Non-blocking / Non-blocking (pre-existing) / Non-blocking (unconfirmed) / Handled in X / Dismissed) | why.
-   - Every bug-hunt finding appears in at least one row, whole or split.
+4. **Ledger, every finding**: first one line for the spec, `Spec: <path or ticket>: R1 met, R2 partial, ...` or `Spec: none available`; then a table `#` | source (bug hunt / _standards_ / _spec_ / _own_ / _pr-risk_) | finding | `path:line` | status (Blocker / Non-blocking / Non-blocking (pre-existing) / Non-blocking (unconfirmed) / Handled in X / Dismissed) | why.
+   - Every bug-hunt, standards and spec finding appears in at least one row, whole or split.
    - Every _own_ observation from Steps 3 and 4 has its own row.
    - The table is required even if the bug hunt says not to repeat its findings: the reviewer re-checks the triage from it.
 5. **Paste-ready comments**: Blockers first, then Non-blocking. Dismissed, Handled and pre-existing findings get none: pre-existing ones go to the summary as tickets to file. Each comment has:
