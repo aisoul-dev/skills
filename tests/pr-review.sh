@@ -71,6 +71,11 @@ has "$out" '**File:** `app/a.ts` · **Line:** 2'
 out="$(bash "$S/comment-link.sh" app/a.ts 2 4 feat)"
 has "$out" '#L2-L4'
 has "$out" '**Lines:** 2–4'
+# Under a C locale bash 3.2 (macOS) read the en dash's first byte as part
+# of the variable name before it and failed with "unbound variable".
+# Linux bash 5 does not reproduce it; CI greps for the pattern instead.
+out="$(LC_ALL=C bash "$S/comment-link.sh" app/a.ts 2 4 feat)" || fail "range under LC_ALL=C must not fail"
+has "$out" '**Lines:** 2–4'
 out="$(bash "$S/comment-link.sh" app/a.ts 7 feat)"
 has "$out" 'file-level comment (L7 is outside the diff)'
 git checkout -q main && printf 'export const z = 0\n' > app/z.ts && git add -A && git commit -qm z && git push -q origin main

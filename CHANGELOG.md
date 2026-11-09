@@ -2,6 +2,12 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.4.1 (2026-11-09)
+
+### pr
+- `comment-link.sh`: a line range no longer fails with `unbound variable` under `LC_CTYPE=C` on bash 3.2 (macOS), where the en dash in `$line–$end` was read as part of the variable name. Now `${line}–${end}`.
+- CI fails on any `$name` followed directly by a non-ASCII character in scripts and tests; a regression test runs the range under `LC_ALL=C`.
+
 ## 1.4.0 (2026-11-08)
 
 ### pr

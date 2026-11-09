@@ -44,6 +44,12 @@ jobs:
             echo "Em dash found, use a hyphen or en dash instead"; exit 1
           fi
 
+      - name: No variable glued to a non-ASCII character in scripts
+        run: |
+          if grep -rnP '\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]' plugins/*/scripts tests; then
+            echo 'Use ${name} before a non-ASCII character: under LC_CTYPE=C bash reads it as part of the name'; exit 1
+          fi
+
       - name: Version bumped for changed plugins
         if: github.event_name == 'pull_request'
         run: |
