@@ -69,7 +69,7 @@ in_diff="$(git diff -U3 "$base...$sha" -- "$path" | awk -v a="$line" -v b="${end
 
 case "$in_diff" in
   line)
-    if [ -n "$end" ]; then echo "**File:** \`$path\` · **Lines:** $line–$end"
+    if [ -n "$end" ]; then echo "**File:** \`$path\` · **Lines:** ${line}–${end}"
     else echo "**File:** \`$path\` · **Line:** $line"; fi ;;
   file) echo "**File:** \`$path\` · file-level comment (L$line is outside the diff)" ;;
   *)    echo "**Where:** general PR comment (about \`$path:$line\`)" ;;
