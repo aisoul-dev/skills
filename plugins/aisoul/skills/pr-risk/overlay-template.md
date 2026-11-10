@@ -15,7 +15,10 @@ reads the first ```text block (or, for the base, the first `code`) under them.
 
 Extra path patterns (extended regex, one per line, matched anywhere in the
 path), passed as `PR_RISK_SENSITIVE`. Each is checked in addition to the
-built-in categories:
+built-in categories. The built-in list stays short and generic (auth, money,
+secrets, schema, infra, dependencies, and the `nuxt`, `vite`, `next` and
+`webpack` configs), so this is the place for your framework's own config:
+`settings.py`, `config/initializers/`, `application.yml`, `astro.config`.
 
 ```text
 app/composables/usePermissions

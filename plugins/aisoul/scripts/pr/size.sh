@@ -17,11 +17,14 @@ source "$(dirname "$0")/lib.sh"
 require_repo pr-size
 
 SMALL_MAX="${PR_SMALL_MAX:-50}"
-DEFAULT_EXCLUDE="docs pnpm-lock.yaml package-lock.json yarn.lock bun.lock bun.lockb"
-
-pathspec=(.)
+# docs/ and every lockfile in LOCKFILES (lib.sh), in any directory.
+pathspec=(. ":(exclude)docs")
 # shellcheck disable=SC2086  # word splitting of the exclude lists is intended
-for p in $DEFAULT_EXCLUDE ${PR_EXCLUDE:-}; do
+for f in $LOCKFILES; do
+  pathspec+=(":(exclude,glob)**/$f")
+done
+# shellcheck disable=SC2086
+for p in ${PR_EXCLUDE:-}; do
   pathspec+=(":(exclude)${p%/}")
 done
 
@@ -56,6 +59,6 @@ else
   shape="large"; budget=400
 fi
 
-excluded="$DEFAULT_EXCLUDE${PR_EXCLUDE:+ $PR_EXCLUDE}"
+excluded="docs, lockfiles${PR_EXCLUDE:+, $PR_EXCLUDE}"
 echo "$label: $files files, +$ins -$del ($total changed lines, excluded: ${excluded})"
 echo "shape: $shape (up to ~$budget words outside <details>)"

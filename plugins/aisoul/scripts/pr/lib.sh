@@ -1,6 +1,6 @@
 # Shared helpers for scripts/pr. Source it, do not run it.
 # shellcheck shell=bash
-# shellcheck disable=SC2034  # BASE and BASE_NOTE are read by the scripts that source this
+# shellcheck disable=SC2034  # BASE, BASE_NOTE and LOCKFILES are read by the scripts that source this
 
 # The base every script compares against, the same way everywhere:
 # PR_BASE if set, else origin/HEAD, else origin/main, else main.
@@ -27,4 +27,16 @@ require_repo() {
     echo "$1: run this from inside a git repository" >&2
     exit 1
   }
+}
+
+# Lockfiles of every package manager the scripts know, by file name. size.sh
+# and pr-describe leave them out of the diff size; risk-facts.sh lists them as
+# dependencies. One list, so the scripts never disagree.
+LOCKFILES="pnpm-lock.yaml package-lock.json npm-shrinkwrap.json yarn.lock bun.lock bun.lockb poetry.lock uv.lock Pipfile.lock Gemfile.lock composer.lock Cargo.lock go.sum"
+
+# LOCKFILES as an ERE matching a path in any directory.
+lockfiles_re() {
+  local names
+  names="$(tr ' ' '\n' <<<"$LOCKFILES" | sed 's/[.]/\\./g' | paste -sd'|' -)"
+  printf '(^|/)(%s)$' "$names"
 }

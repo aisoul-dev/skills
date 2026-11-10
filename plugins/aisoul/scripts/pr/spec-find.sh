@@ -12,7 +12,7 @@
 #   PR_BASE        base ref (default: origin/HEAD, else origin/main, else main)
 #   PR_SPEC_DIRS   spec folders from the repo root, one per line (default:
 #                  docs/specs specs docs/superpowers/specs .scratch docs)
-#   PR_TICKET_RE   ticket pattern, ERE (default: [A-Z][A-Z0-9]+-[0-9]+, minus
+#   PR_TICKET_RE   ticket pattern, ERE (default: [A-Z][A-Z0-9]*-[0-9]+, minus
 #                  standards such as UTF-8, SHA-256, ISO-8601, RFC-...)
 # Exit: 0 with at least one candidate file, 1 with none (ask the user),
 #       2 on an empty range or an invalid PR_TICKET_RE.
@@ -29,7 +29,7 @@ if [ -z "$(git rev-list -1 "$BASE..$branch")" ]; then
   exit 2
 fi
 
-ticket_re="${PR_TICKET_RE:-[A-Z][A-Z0-9]+-[0-9]+}"
+ticket_re="${PR_TICKET_RE:-[A-Z][A-Z0-9]*-[0-9]+}"
 rc=0; grep -qE "$ticket_re" </dev/null 2>/dev/null || rc=$?
 [ "$rc" -le 1 ] || { echo "pr-spec-find: PR_TICKET_RE is not a valid extended regex: $ticket_re" >&2; exit 2; }
 STANDARDS='^(UTF|SHA|ISO|RFC|MD|ES|IEEE|ECMA|HTTP|TLS|SSL)-'

@@ -1,14 +1,14 @@
 # aisoul skills
 
-A Claude Code plugin marketplace with my skills for Nuxt / Vue / TypeScript work. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`.
+A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`. The `pr` skills work on any stack; the `untangle` skills are for Nuxt / Vue / TypeScript.
 
-| Skill | What it does |
-|-------|--------------|
-| `/aisoul:untangle-audit` | Read-only structural audit, writes a decision log of PR-sized fixes |
-| `/aisoul:untangle-fix` | Applies one fix from that log as one small PR |
-| `/aisoul:pr-describe` | Short, evidence-first PR description sized to the diff |
-| `/aisoul:pr-risk` | Merge-risk assessment in five dimensions, for a reviewer or as a self-check |
-| `/aisoul:pr-review` | Branch review with a verdict: bug hunt, context checks, gates, merge risk, paste-ready comments |
+| Skill | Stack | What it does |
+|-------|-------|--------------|
+| `/aisoul:untangle-audit` | Nuxt / Vue / TS | Read-only structural audit, writes a decision log of PR-sized fixes |
+| `/aisoul:untangle-fix` | Nuxt / Vue / TS | Applies one fix from that log as one small PR |
+| `/aisoul:pr-describe` | any | Short, evidence-first PR description sized to the diff |
+| `/aisoul:pr-risk` | any | Merge-risk assessment in five dimensions, for a reviewer or as a self-check |
+| `/aisoul:pr-review` | any | Branch review with a verdict: bug hunt, context checks, gates, merge risk, paste-ready comments |
 
 Details: [plugins/aisoul](plugins/aisoul).
 

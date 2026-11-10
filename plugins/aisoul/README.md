@@ -1,16 +1,18 @@
 # aisoul
 
-Grygorii Liashenko's skill set for Claude Code, tuned for Nuxt / Vue / TypeScript work. Every skill is invoked as `/aisoul:<skill>`.
+Grygorii Liashenko's skill set for Claude Code. Every skill is invoked as `/aisoul:<skill>`.
+
+The `pr` skills work on any stack: they take gates from the overlay, CI, the project's own instructions or its build files (`package.json`, `Makefile`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`), and their risk signals know JS/TS, Python, Go, Ruby, Rust, Java and shell. The `untangle` skills are for Nuxt / Vue / TypeScript only: their dependency rules encode a Nuxt layout and `surface.sh` needs `vue-tsc`.
 
 ## Skills
 
-| Skill | Group | What it does |
-|-------|-------|--------------|
-| `/aisoul:untangle-audit [path or concern]` | untangle | Read-only. Measures change locality and patches, finds causes, writes a decision log of PR-sized fixes to `docs/untangle/`. Changes no code. |
-| `/aisoul:untangle-fix <log path> <fix id>` | untangle | Applies one fix from the log as one branch and one PR: re-verify, pin behavior with tests, implement, separate review, update the log. |
-| `/aisoul:pr-describe [branch \| --squash <sha>]` | pr | Writes a short, evidence-first PR description whose length follows the diff. Also triggers when you ask for a PR description. |
-| `/aisoul:pr-review [PR \| branch] [--own]` | pr | Reviews a branch for approval: scope, bug hunt, context checks, gates, merge risk, triage with proof, a ledger of every finding and paste-ready comments. `--own` returns a fix list instead. |
-| `/aisoul:pr-risk [PR \| branch \| --squash <sha>]` | pr | Assesses merge risk in five dimensions with evidence and one risk-lowering action each. Read-only; posts a PR comment only when asked. Also triggers when you ask how risky a PR is. |
+| Skill | Group | Stack | What it does |
+|-------|-------|-------|--------------|
+| `/aisoul:untangle-audit [path or concern]` | untangle | Nuxt / Vue / TS | Read-only. Measures change locality and patches, finds causes, writes a decision log of PR-sized fixes to `docs/untangle/`. Changes no code. |
+| `/aisoul:untangle-fix <log path> <fix id>` | untangle | Nuxt / Vue / TS | Applies one fix from the log as one branch and one PR: re-verify, pin behavior with tests, implement, separate review, update the log. |
+| `/aisoul:pr-describe [branch \| --squash <sha>]` | pr | any | Writes a short, evidence-first PR description whose length follows the diff. Also triggers when you ask for a PR description. |
+| `/aisoul:pr-review [PR \| branch] [--own]` | pr | any | Reviews a branch for approval: scope, bug hunt, context checks, gates, merge risk, triage with proof, a ledger of every finding and paste-ready comments. `--own` returns a fix list instead. |
+| `/aisoul:pr-risk [PR \| branch \| --squash <sha>]` | pr | any | Assesses merge risk in five dimensions with evidence and one risk-lowering action each. Read-only; posts a PR comment only when asked. Also triggers when you ask how risky a PR is. |
 
 Skills are named `<group>-<action>` so related ones sort together in `/` completion. Heavy workflows run only when you call them (`disable-model-invocation: true`).
 

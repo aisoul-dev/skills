@@ -190,11 +190,22 @@ printf 'l\n' > app/l.ts && git add -A && git commit -qm loader
 out="$(PR_BASE=main bash "$SF" story/specs-loader || true)"
 hasnt "$out" 'SHOP-77-checkout.md` ('
 
+# A one-letter board prefix (T-25) is a ticket by default; standards still are not.
+git checkout -q -b agent/l5xmg main
+printf '# PR link\n' > docs/specs/T-25-pr-link.md
+git add -A && git commit -qm specs-t25
+git checkout -q -b agent/l5xmg-work
+printf 't\n' > app/t.ts && git add -A && git commit -qm "[T-25] PR link in release notes" -m "Uses UTF-8 names"
+out="$(PR_BASE=agent/l5xmg bash "$SF" agent/l5xmg-work || true)"
+has "$out" '- ticket `T-25`'
+hasnt "$out" 'ticket `F-8`'
+grep -A2 'naming a ticket' <<<"$out" | grep -qF -- '- `docs/specs/T-25-pr-link.md`' || fail "spec naming T-25 not listed: $out"
+
 set +e; PR_BASE=main PR_TICKET_RE='[' bash "$SF" story/zahlung >/dev/null 2>&1; code=$?; set -e
 [ "$code" = 2 ] || fail "an invalid PR_TICKET_RE must exit 2, got $code"
 
 out="$(bash "$S/overlay-env.sh" "$ROOT/plugins/aisoul/skills/pr-review/overlay-template.md")"
 has "$out" "export PR_SPEC_DIRS='docs/specs'"
-has "$out" "export PR_TICKET_RE='[A-Z][A-Z0-9]+-[0-9]+'"
+has "$out" "export PR_TICKET_RE='[A-Z][A-Z0-9]*-[0-9]+'"
 
 echo "pr-review: OK"
