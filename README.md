@@ -21,7 +21,20 @@ claude plugin install aisoul@aisoul
 
 Inside a session the same works as `/plugin marketplace add aisoul-dev/skills`, then `/plugin install aisoul@aisoul`.
 
-Update later with `claude plugin marketplace update aisoul`.
+### Update
+
+Two steps: `marketplace update` refreshes the catalog only, `plugin update` installs the new version.
+
+```bash
+claude plugin marketplace update aisoul
+claude plugin update aisoul@aisoul
+```
+
+Restart Claude Code afterwards: a running session keeps the version it started with. To see what is installed, list the cached versions:
+
+```bash
+ls ~/.claude/plugins/cache/aisoul/aisoul/
+```
 
 ### Several Claude Code config directories
 
@@ -34,6 +47,8 @@ CLAUDE_CONFIG_DIR=~/.claude-personal claude plugin install aisoul@aisoul
 CLAUDE_CONFIG_DIR=~/.claude-work claude plugin marketplace add aisoul-dev/skills
 CLAUDE_CONFIG_DIR=~/.claude-work claude plugin install aisoul@aisoul
 ```
+
+Update each of them the same way, with the same `CLAUDE_CONFIG_DIR` in front of both update commands; the cache is then under that directory (`~/.claude-personal/plugins/cache/aisoul/aisoul/`).
 
 ## Layout
 
@@ -83,7 +98,16 @@ CI runs the same checks on every push and pull request.
 
 1. Bump `version` in `plugins/aisoul/.claude-plugin/plugin.json`.
 2. Add the entry to `CHANGELOG.md`.
-3. Merge to `main`, tag `v<version>` (e.g. `v1.1.0`).
+3. Merge to `main`. Only then tag the merge commit and push the tag:
+
+   ```bash
+   git fetch origin
+   git tag v<version> origin/main
+   git push origin v<version>
+   ```
+
+   A tag made before the merge points at the old `main`. Move it with `git tag -f v<version> <merge sha>` and `git push --force origin v<version>`.
+4. Update the installed copies (Update, above).
 
 ## License
 
