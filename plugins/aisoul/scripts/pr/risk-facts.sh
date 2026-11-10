@@ -56,8 +56,10 @@ CATEGORIES=(
   "secrets and security config${T}(^|/)\.env|secret|credential|${B}(csp|security|cors)([./_-]|\$)|(^|/)(nuxt|vite|next|webpack)\.config\."
   "data and schema${T}(^|/)(migrations?|schema|seeds?)([./_-]|\$)|\.sql\$|(^|/)prisma/|(^|/)drizzle/"
   "infra and CI${T}(^|/)\.github/workflows/|\.gitlab-ci\.ya?ml\$|(^|/)(k8s|helm|terraform|infra|deploy|nginx|caddy)(/|\$)|Dockerfile|docker-compose|(^|/)compose\.ya?ml\$"
-  "dependencies${T}(^|/)package\.json\$|pnpm-lock\.yaml\$|package-lock\.json\$|yarn\.lock\$|bun\.lockb?\$|requirements\.txt\$|go\.(mod|sum)\$|Cargo\.(toml|lock)\$"
+  "dependencies${T}(^|/)(package\.json|pyproject\.toml|Pipfile|go\.mod|Cargo\.toml|Gemfile|composer\.json|[^/]*requirements[^/]*\.txt)\$|$(lockfiles_re)"
 )
+# Framework config files beyond the few above belong in the overlay's
+# Sensitive paths (PR_RISK_SENSITIVE), not in this list.
 if [ -n "${PR_RISK_SENSITIVE:-}" ]; then
   while IFS= read -r re; do
     [ -n "$re" ] && CATEGORIES+=("project-sensitive \`$re\`${T}$re")
@@ -68,6 +70,9 @@ REPORTING='Sentry\.|captureException|captureMessage|reportError|logger\.(error|f
 [ -n "${PR_RISK_REPORTING:-}" ] && REPORTING="$REPORTING|$PR_RISK_REPORTING"
 FLAGS='feature[_-]?flag|featureFlag|isFeatureEnabled|isEnabled\(|useFeature|useFlag|getFlag|unleash|launchdarkly|growthbook'
 [ -n "${PR_RISK_FLAGS:-}" ] && FLAGS="$FLAGS|$PR_RISK_FLAGS"
+
+# Test files in the languages the signals know: JS/TS, Go, Python, Ruby.
+TEST_PATHS='\.(spec|test)\.|(^|/)(tests?|__tests__|e2e|spec)/|_test\.(go|py)$|_spec\.rb$|(^|/)test_[^/]*\.py$'
 
 # core.quotePath=false keeps non-ASCII paths readable instead of quoted and escaped.
 gd() { git -c core.quotePath=false diff "$@"; }
@@ -155,6 +160,21 @@ quiet_catches() {
   ' <<<"$1"
 }
 
+# Handlers whose whole body is the next added line of the same file:
+# Python "except ...:" followed by "pass", Go "if err != nil {" followed by "}".
+# The one-line forms are matched by the swallowed-errors pattern itself.
+empty_handlers() {
+  awk '
+    {
+      p = $0; sub(/\t.*/, "", p); t = $0; sub(/^[^\t]+\t\+/, "", t)
+      if (want != "" && p == file && t ~ want) print first
+      want = ""
+      if (p ~ /\.py$/ && t ~ /^[[:space:]]*except([[:space:]][^:]*)?:[[:space:]]*(#.*)?$/) { want = "^[[:space:]]*pass[[:space:]]*(#.*)?$"; first = $0; file = p }
+      else if (p ~ /\.go$/ && t ~ /if[[:space:]]+err[[:space:]]*!=[[:space:]]*nil[[:space:]]*\{[[:space:]]*$/) { want = "^[[:space:]]*\\}"; first = $0; file = p }
+    }
+  ' <<<"$1"
+}
+
 echo "## Changed files"
 echo
 awk -F'\t' 'NF { printf "- %s `%s`\n", substr($1, 1, 1), $NF }' <<<"$files"
@@ -193,20 +213,24 @@ section() {
     echo
   fi
 }
-section "Added swallowed errors" "$(hits 'catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*\}|\.catch\((\([^)]*\)[[:space:]]*=>[[:space:]]*(\{[[:space:]]*\}|null|undefined|void 0)|noop|_\.noop)\)' "$added")"
+section "Added swallowed errors" "$( { hits 'catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*\}|\.catch\((\([^)]*\)[[:space:]]*=>[[:space:]]*(\{[[:space:]]*\}|null|undefined|void 0)|noop|_\.noop)\)|\bexcept([[:space:]][^:]*)?:[[:space:]]*pass[[:space:]]*(#.*)?$|if[[:space:]]+err[[:space:]]*!=[[:space:]]*nil[[:space:]]*\{[[:space:]]*\}' "$added"; empty_handlers "$added"; } | head -n "$MAX")"
 section "Added catch blocks that only log, or are empty or a comment" "$(quiet_catches "$added" | head -n "$MAX")"
 section "Removed error reporting" "$(hits "$REPORTING" "$removed")"
 section "Added error reporting" "$(hits "$REPORTING" "$added")"
-section "Added type or lint escapes" "$(hits '@ts-ignore|@ts-expect-error|as any\b|eslint-disable' "$added")"
+ESCAPES='@ts-ignore|@ts-expect-error|@ts-nocheck|as any\b|eslint-disable|#[[:space:]]*type:[[:space:]]*ignore|#[[:space:]]*noqa\b|#[[:space:]]*pylint:[[:space:]]*disable|//[[:space:]]*nolint\b|#!?\[allow\(|@SuppressWarnings|#[[:space:]]*shellcheck[[:space:]]+disable|rubocop:disable'
+section "Added type or lint escapes" "$(hits "$ESCAPES" "$added")"
 section "Destructive data operations" "$(hits 'DROP[[:space:]]+(TABLE|COLUMN|INDEX)|ALTER[[:space:]]+TABLE.*DROP|TRUNCATE|DELETE[[:space:]]+FROM|dropTable|dropColumn|removeColumn' "$added")"
 section "Feature flags" "$(hits "$FLAGS" "$code_lines")"
-section "Skipped or removed tests" "$( { grep -E "^[^$T]+$T\\+.*\\b(it|test|describe)\\.(skip|skipIf|todo|only|fails)\\b" <<<"$code_lines" || true; grep -E "^[^$T]*(\\.(spec|test)\\.[cm]?[jt]sx?|_test\\.go|_spec\\.rb)$T-.*\\b(it|test)\\(" <<<"$code_lines" || true; } | head -n "$MAX")"
+# Skipped: Jest/Vitest/Mocha (it.skip, xit), pytest (mark.skip, skipif, pytest.skip),
+# Go (t.Skip), RSpec (xit, xdescribe, a bare skip in a _spec.rb file).
+SKIPPED='\b(it|test|describe)\.(skip|skipIf|todo|only|fails)\b|\b(xit|xtest|xdescribe|xcontext|xspecify)\b[[:space:]]*[('"'"'"]|@pytest\.mark\.(skip|skipif|xfail)\b|\bpytest\.skip\(|\bt\.Skip(f|Now)?\('
+section "Skipped or removed tests" "$( { grep -E "^[^$T]+$T\\+.*($SKIPPED)" <<<"$code_lines" || true; grep -E "^[^$T]*_spec\\.rb$T\\+[[:space:]]*skip\\b" <<<"$code_lines" || true; grep -E "^[^$T]*(\\.(spec|test)\\.[cm]?[jt]sx?|_test\\.go|_spec\\.rb|_test\\.py|/test_[^/]*\\.py|^test_[^/]*\\.py)$T-.*(\\b(it|test)\\(|func Test|def test_)" <<<"$code_lines" || true; } | head -n "$MAX")"
 
-deleted_tests="$(awk -F'\t' '$1 == "D" { print $NF }' <<<"$files" | grep -E '\.(spec|test)\.|(^|/)(tests?|__tests__|e2e)/' || true)"
+deleted_tests="$(awk -F'\t' '$1 == "D" { print $NF }' <<<"$files" | grep -E "$TEST_PATHS" || true)"
 section "Deleted test files" "$deleted_tests"
 [ "$signals" = 1 ] || { echo "- none found"; echo; }
 
-changed_tests="$(grep -cE '\.(spec|test)\.|(^|/)(tests?|__tests__|e2e)/' <<<"$paths" || true)"
+changed_tests="$(grep -cE "$TEST_PATHS" <<<"$paths" || true)"
 changed_total="$(wc -l <<<"$paths" | tr -d ' ')"
 echo "## Test files"
 echo

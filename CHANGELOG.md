@@ -2,6 +2,19 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.5.0 (2026-11-10)
+
+The `pr` skills pick sensible defaults on any stack. The JS/Nuxt path gives the same results as before, and the overlay stays the way to tune a project.
+
+### pr
+- `pr-review`: gates come from the first source that has them: the overlay, CI config, the tests section of `CLAUDE.md`, `AGENTS.md` or `CONTRIBUTING.md` (running only what the diff touches), then the build files (`package.json`, `Makefile`/`justfile`, `pyproject.toml`/`tox.ini`/`noxfile.py`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`). A linter or formatter runs only with its config present; a long suite runs the part the diff touches. The reply names the source.
+- `pr-review`: the Contract row no longer assumes a frontend ("the calling side's own types"); Duplication says "function, module, helper or component".
+- Default ticket pattern `[A-Z][A-Z0-9]*-[0-9]+`, so one-letter board prefixes such as `T-25` count. Checked first on the orgmaps history: one-letter ids appear only in old merged commits (acceptance and finding labels), none in the 58 latest branch ranges. Standards (UTF-8, SHA-256, ...) are still filtered.
+- `risk-facts.sh`: type and lint escapes for Python (`# type: ignore`, `# noqa`, `# pylint: disable`), Go (`//nolint`), Rust (`#[allow(`), Java (`@SuppressWarnings`), shell (`# shellcheck disable`), Ruby (`rubocop:disable`) and `@ts-nocheck`; swallowed errors for Python `except ...: pass` and an empty Go `if err != nil {}`, one-line and two-line; skipped tests for pytest, Go `t.Skip`, `xit`/`xdescribe` and RSpec `skip`; deleted tests and the test count know Go and Python test files. Each pattern has a test with a line it must catch and a near miss it must not.
+- One lockfile list in `scripts/pr/lib.sh` (JS, Python, Ruby, PHP, Rust, Go), read by `size.sh`, `risk-facts.sh` and pr-describe. `size.sh` now leaves out lockfiles in subfolders too; `risk-facts.sh` lists Python, Ruby and PHP manifests as dependencies.
+- The pr-risk overlay template documents Sensitive paths as the place for a framework's own config; the built-in list stays short.
+- README: which skills work on any stack (`pr-*`) and which are Nuxt / Vue / TS only (`untangle-*`).
+
 ## 1.4.1 (2026-11-09)
 
 ### pr

@@ -1,6 +1,6 @@
 {
   "name": "aisoul",
-  "description": "aisoul skills for Claude Code: structural audits, refactoring and spec-driven workflow for Nuxt / Vue / TypeScript work.",
+  "description": "aisoul skills for Claude Code: PR descriptions, merge risk and branch review for any stack, plus structural audits and refactoring for Nuxt / Vue / TypeScript.",
   "owner": {
     "name": "Grygorii Liashenko (aisoul)",
     "url": "https://aisoul.dev"
@@ -19,6 +19,7 @@
         "nuxt",
         "vue",
         "typescript",
+        "stack-agnostic",
         "pull-requests",
         "merge-risk",
         "code-review",

@@ -23,6 +23,7 @@ git checkout -q -b small
 printf 'b\nc\n' >> src/a.ts
 seq 1 500 > docs/notes.md            # excluded: must not push it into large
 seq 1 300 > pnpm-lock.yaml           # excluded lockfile
+mkdir -p svc ui && seq 1 300 > svc/go.sum && seq 1 300 > ui/poetry.lock   # lockfiles in subfolders too
 git add -A && git commit -qm small
 
 out="$(PR_BASE=main bash "$SCRIPTS/size.sh" small)"

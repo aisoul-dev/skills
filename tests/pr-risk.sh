@@ -199,6 +199,113 @@ hasnt "$out" 'app/fixtures/f.ts:+'
 out="$(PR_BASE=parsing PR_RISK_EXCLUDE='fixtures/' bash "$FACTS" parsing-change)"
 has "$out" 'app/fixtures/f.ts:+'   # anchored at the repo root, as documented
 
+# --- other stacks: each pattern catches one line and leaves its near miss ------
+git checkout -q -b stacks-base main
+mkdir -p svc/pkg py app spec scripts rs
+printf 'package pkg\nfunc TestOld(t *testing.T) {}\n' > svc/pkg/old_test.go
+printf 'def test_old():\n    assert True\n' > app/test_old.py
+git add -A && git commit -qm stacks-base
+git checkout -q -b stacks
+git rm -q svc/pkg/old_test.go app/test_old.py
+mkdir -p svc/pkg
+cat > py/a.py <<'EOF'
+x = f()  # type: ignore
+# the type is ignored here
+import os  # noqa
+noqa_count = 1
+# pylint: disable=invalid-name
+# pylint is disabled in CI
+try:
+    a()
+except ValueError: pass
+try:
+    b()
+except ValueError: return None
+try:
+    c()
+except KeyError:
+    pass
+try:
+    d()
+except IndexError:
+    log.warning(e)
+@pytest.mark.skip(reason="slow")
+@pytest.mark.skipif(sys.platform == "win32", reason="posix")
+@pytest.mark.parametrize("a", [1])
+EOF
+cat > svc/pkg/b.go <<'EOF'
+x := f() //nolint
+// nolinter is a name
+if err != nil {}
+if err != nil { return err }
+if err2 := g(); err2 != nil {
+	return err2
+}
+if err != nil {
+}
+if err != nil {
+	return err
+}
+func TestB(t *testing.T) { t.Skip("flaky") }
+func TestC(t *testing.T) { if t.Skipped() { return } }
+EOF
+cat > rs/lib.rs <<'EOF'
+#[allow(dead_code)]
+#[derive(Debug)]
+EOF
+cat > app/A.java <<'EOF'
+@SuppressWarnings("unchecked")
+@Override
+EOF
+cat > scripts/run.sh <<'EOF'
+# shellcheck disable=SC2086
+# shellcheck source=lib.sh
+EOF
+cat > app/b.rb <<'EOF'
+foo # rubocop:disable Style/X
+# rubocop config lives in .rubocop.yml
+skip_validation = true
+EOF
+cat > spec/c_spec.rb <<'EOF'
+xit "does a thing" do
+  skip "pending upstream"
+  skip_count = 1
+EOF
+cat > app/d.ts <<'EOF'
+// @ts-nocheck
+// ts-nocheck is not used
+xit('a', () => {})
+xdescribe('b', () => {})
+process.exit(1)
+EOF
+mkdir -p tools
+printf '[project]\nname = "x"\n' > pyproject.toml
+printf 'h1\n' > svc/go.sum
+printf 'GEM\n' > tools/Gemfile.lock
+printf 'notes\n' > py/requirements-notes.md
+git add -A && git commit -qm stacks
+out="$(PR_BASE=stacks-base bash "$FACTS" stacks)"
+for line in 'py/a.py:+x = f()  # type: ignore' 'py/a.py:+import os  # noqa' 'py/a.py:+# pylint: disable=invalid-name' \
+  'svc/pkg/b.go:+x := f() //nolint' 'rs/lib.rs:+#[allow(dead_code)]' 'app/A.java:+@SuppressWarnings("unchecked")' \
+  'scripts/run.sh:+# shellcheck disable=SC2086' 'app/b.rb:+foo # rubocop:disable Style/X' 'app/d.ts:+// @ts-nocheck' \
+  'py/a.py:+except ValueError: pass' 'py/a.py:+except KeyError:' 'svc/pkg/b.go:+if err != nil {}' \
+  '@pytest.mark.skip(reason="slow")' '@pytest.mark.skipif(sys.platform' 't.Skip("flaky")' \
+  "app/d.ts:+xit('a', () => {})" "app/d.ts:+xdescribe('b'" 'spec/c_spec.rb:+xit "does a thing" do' \
+  'spec/c_spec.rb:+  skip "pending upstream"' 'svc/pkg/old_test.go:-func TestOld' 'app/test_old.py:-def test_old' \
+  '`svc/pkg/old_test.go`' '`app/test_old.py`'; do
+  has "$out" "$line"
+done
+for line in 'the type is ignored' 'noqa_count' 'pylint is disabled' 'nolinter' 'return None' 'except IndexError' \
+  'if err != nil { return err }' 'err2 := g()' '#[derive' '@Override' 'shellcheck source' 'rubocop config' \
+  'skip_validation' 'skip_count' 'ts-nocheck is not used' 'process.exit' 'parametrize' 't.Skipped'; do
+  hasnt "$out" "$line"
+done
+# Only the handler whose body is just "}" is quiet, not the one that returns.
+[ "$(grep -c 'svc/pkg/b.go:+if err != nil {$' <<<"$out")" = 1 ] || fail "only the empty Go handler is swallowed"
+grep -qxF -- '- **dependencies**: `pyproject.toml`, `svc/go.sum`, `tools/Gemfile.lock`' <<<"$out" \
+  || fail "dependencies: $(grep dependencies <<<"$out")"
+has "$out" '- 3 of 14 changed files are tests'
+
 # --- overlay-env.sh: the repo's overlay and the template load as documented ---
 ENV="$ROOT/plugins/aisoul/scripts/pr/overlay-env.sh"
 out="$(bash "$ENV" "$ROOT/.claude/aisoul/pr-risk.md")"

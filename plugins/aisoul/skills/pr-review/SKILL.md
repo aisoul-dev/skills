@@ -26,8 +26,8 @@ If the repository has `.claude/aisoul/pr-review.md`, read it first. Its values r
 | Bug hunt | Claude Code's built-in `/code-review` at `xhigh` against the base; otherwise Step 2's own hunt |
 | Standards review | a standards and spec review skill, if one is installed (for example `code-review` from `mattpocock/skills`); none otherwise |
 | Spec folders | `docs/specs`, `specs`, `docs/superpowers/specs`, `.scratch`, `docs` |
-| Ticket pattern | `[A-Z][A-Z0-9]+-[0-9]+` |
-| Gates | what CI runs, read from its config (`.github/workflows/`, `.gitlab-ci.yml`, ...), run locally; else detected from the project (Step 4) |
+| Ticket pattern | `[A-Z][A-Z0-9]*-[0-9]+` |
+| Gates | the first of: CI config run locally, the tests section of `CLAUDE.md`, `AGENTS.md` or `CONTRIBUTING.md`, the build files (Step 4) |
 | Ratchets | none. A ratchet is a pattern a PR must not add more of than it removes, e.g. explicit `any` |
 | Constraints | the "must" and "never" rules in the repo's `CLAUDE.md` or `AGENTS.md`, and the Constraints or Runtime sections of any overlay in `.claude/aisoul/` |
 | Feature flags | none known |
@@ -105,15 +105,35 @@ It lists remote branches built on this branch's commits, each with its own chang
 | **Pre-existing** | `git show <base>:<file>` already has the defect | _Non-blocking (pre-existing)_: suggest a ticket. If this branch newly exposes the path, it counts as introduced only if the valid-input main flow breaks (Step 5) |
 | **Reachable on the base?** | For a removed or changed page, route or component: `git grep -n '<route or name>' <base> -- <app dir>` | If nothing on the base links to it, removing it is not a user-facing regression |
 | **Feature flag** | Is the surface behind one of the overlay's flags? Check what the flag actually hides: an entry point, or the whole surface | A flag that only hides an entry point lowers discoverability, not reachability. Never use a flag to downgrade a correctness finding |
-| **Contract** | If the finding depends on API behaviour: read the contract source from the overlay (a backend checkout, an OpenAPI file, a schema) at its main branch, the DTO and the test that covers the input | Cite the file. Mark each claim _tested_ (a test covers exactly this input) or _inferred_ (read from code or constraints). Never infer the contract from frontend types |
+| **Contract** | If the finding depends on API behaviour: read the contract source from the overlay (a backend checkout, an OpenAPI file, a schema) at its main branch, the DTO and the test that covers the input | Cite the file. Mark each claim _tested_ (a test covers exactly this input) or _inferred_ (read from code or constraints). Never infer the contract from the calling side's own types |
 | **Test expectation changed** | `bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/changed-expects.sh"` lists assertions the branch changed or removed, not just added | Own row. Does the new expectation match the spec or acceptance criteria? A legitimate behaviour change is fine; one that only makes the branch pass is a Blocker |
-| **Duplication** | For each function, composable, util or component the branch adds, `git grep` the base for the same logic: similar names, the same API call, the same transform. Also compare the branch's new code against itself | Own row, Non-blocking. Name every copy with `path:line` and where the shared version should live. A Blocker only under a constraint in Step 5, e.g. an API call outside the layer the project allows |
+| **Duplication** | For each function, module, helper or component the branch adds, `git grep` the base for the same logic: similar names, the same API call, the same transform. Also compare the branch's new code against itself | Own row, Non-blocking. Name every copy with `path:line` and where the shared version should live. A Blocker only under a constraint in Step 5, e.g. an API call outside the layer the project allows |
 
 **If the checks give different answers for different parts of one finding, split it into rows `1a`, `1b`, ...** with one status each. For example: the error case is handled in B, the "only way in" claim is disproved, and the silent failure is pre-existing. Each row gets its own status and, if needed, its own comment.
 
 ## Step 4: Mechanical gates and merge risk
 
-Run the overlay's gates. Without an overlay, mirror CI: read its config and run the same commands locally, as far as they run without CI's secrets or services. Without CI config, detect them: the package manager from the lockfile, then the `typecheck`, `lint` and `test` scripts in `package.json` (or `tsc --noEmit` when there is a `tsconfig.json`). Lint and format only the changed files, and never pass an empty list, which lints the whole repo:
+Take the gates from the first source that has them, and name the source in the Gates part of the reply:
+
+1. **The overlay's gates.**
+2. **CI config** (`.github/workflows/`, `.gitlab-ci.yml`, ...): run the same commands locally, as far as they run without CI's secrets or services.
+3. **The project's own instructions**: a tests or checks section in `CLAUDE.md`, `AGENTS.md` or `CONTRIBUTING.md`. When it says to run what a change touches and lists commands per area, run the ones this diff touches, not every suite.
+4. **The build files**, from this table. A repo with several build files (a Go service next to a JS UI) takes the rows of the areas the diff touches.
+
+| Build file | Gates |
+|------------|-------|
+| `package.json` with a lockfile | The package manager from the lockfile. The `typecheck`, `lint` and `test` scripts in `package.json`, or `tsc --noEmit` when there is a `tsconfig.json` and no `typecheck` script. eslint on changed `.ts/.tsx/.js/.vue` files only with an eslint config present; prettier only with a prettier config present |
+| `Makefile` or `justfile` | targets named `test`, `check`, `lint` |
+| `pyproject.toml`, `tox.ini` or `noxfile.py` | `pytest`; `ruff`, `flake8` or `mypy` only when configured |
+| `go.mod` | `go vet ./...`, `go test ./...` |
+| `Cargo.toml` | `cargo clippy`, `cargo test` |
+| `Gemfile` | `rake` or `rspec`; `rubocop` only with `.rubocop.yml` |
+| `composer.json` | its `test` script, else `phpunit` |
+
+Rules for every source:
+
+- Run a linter or formatter only when the project has its config. No config, no gate, and nothing about it under _Not checked_.
+- Lint and format only the changed files, and never pass an empty list, which lints the whole repo:
 
 ```bash
 git diff --name-only --diff-filter=d <base>...HEAD | grep -E '\.(ts|tsx|js|vue)$' | xargs -r <pm> exec eslint
@@ -121,6 +141,8 @@ git diff --name-only --diff-filter=d <base>...HEAD | xargs -r <pm> exec prettier
 ```
 
 Use `xargs`, not a shell variable: zsh does not word-split variables.
+
+- When the full suite is long (a root script that chains many suites), run the part the diff touches and say which part. A gate not run goes under _Not checked_.
 
 For each ratchet in the overlay:
 

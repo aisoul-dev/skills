@@ -17,7 +17,7 @@ If the repository has `.claude/aisoul/pr-describe.md`, read it first. Its values
 | Location | `$(git rev-parse --git-dir)/pr-description/<branch>.md`, with `/` in the branch name replaced by `-`; inside `.git/`, so it is never committed. Create the directory if needed |
 | Title | `# <title>`, or `# [<ticket>] <title>` when the branch name carries a ticket ID |
 | Base branch | `origin/HEAD`, else `main` |
-| Excluded paths | `docs/` and lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `bun.lockb`) |
+| Excluded paths | `docs/` and lockfiles in any directory: the list in `scripts/pr/lib.sh` (JS, Python, Ruby, PHP, Rust and Go lockfiles) |
 | Checks tab | the jobs defined in the repository's CI config (`.github/workflows/` or equivalent). The PR may not be open yet, so read the config rather than guessing |
 | Live environment | none named; apply the rule in "Live environment" generically |
 | Screenshots | desktop width; add a narrow-width capture only when the change is about responsive layout |
