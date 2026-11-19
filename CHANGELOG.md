@@ -2,6 +2,11 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.5.1 (2026-11-20)
+
+### pr
+- `ratchet.sh --code` drops comments before counting (whole `//`, `/*`, `*` and `<!--` lines, a trailing ` // ...`, inline `/* ... */` and `<!-- ... -->`). The explicit-`any` ratchet in the overlay template now uses it: prose such as "allows: any two" in a comment counted as an added `any` and turned the ratchet red. Patterns that live in comments (`eslint-disable`, `TODO`) keep counting without the flag.
+
 ## 1.5.0 (2026-11-10)
 
 The `pr` skills pick sensible defaults on any stack. The JS/Nuxt path gives the same results as before, and the overlay stays the way to tune a project.

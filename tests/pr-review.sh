@@ -46,6 +46,25 @@ out="$(bash "$S/ratchet.sh" '(:|<|,|\bas)\s*any\b' feat -- '*.ts' && echo exit0 
 has "$out" 'added 1, removed 0, net 1'
 has "$out" 'exit2'
 
+# ratchet --code: comments do not count, code does
+git checkout -q -b any-comments feat
+cat > app/c.ts <<'EOF'
+// allows: any two
+/* takes: any value */
+/**
+ * accepts: any shape, see below
+ */
+export const w = 1 // returns: any thing
+export const z = (a: any) => a /* , any */
+EOF
+printf '<template>\n  <!-- props: any -->\n  <p>{{ (x as any).y }}</p>\n</template>\n' > app/c.vue
+git add -A && git commit -qm any-comments
+out="$(PR_BASE=feat bash "$S/ratchet.sh" '(:|<|,|\bas)\s*any\b' any-comments -- '*.ts' '*.vue' || true)"
+has "$out" 'added 8, removed 0, net 8'
+out="$(PR_BASE=feat bash "$S/ratchet.sh" --code '(:|<|,|\bas)\s*any\b' any-comments -- '*.ts' '*.vue' || true)"
+has "$out" 'added 2, removed 0, net 2'
+git checkout -q feat
+
 # changed expectations
 out="$(bash "$S/changed-expects.sh" feat)"
 has "$out" "-it('adds', () => { expect(add(1, 1)).toBe(2) })"
