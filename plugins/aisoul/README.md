@@ -61,7 +61,7 @@ Use it as a review aid (chat, or a PR comment when asked) or as a self-check bef
 |--------|--------------|
 | `scope.sh [branch]` | ahead/behind the remote base, merge state and conflicting files (exit 3: stop), commits, diffstat |
 | `stacked.sh [branch] [-- paths]` | branches built on this one, counted from the merge base, with merge states and their diff for given paths |
-| `ratchet.sh '<ERE>' [branch] [-- pathspec]` | a pattern added vs removed; exit 0 down, 1 even, 2 up |
+| `ratchet.sh [--code] '<ERE>' [branch] [-- pathspec]` | a pattern added vs removed (`--code`: comments left out); exit 0 down, 1 even, 2 up |
 | `changed-expects.sh [branch]` | test assertions the branch changed or removed, not just added |
 | `comment-link.sh <path> <line> [end] [branch]` | link at the pushed commit and the placement line GitHub will accept |
 | `spec-find.sh [branch]` | ticket and issue references, and candidate spec files: changed by the branch, naming a ticket, sharing words with the branch name (`PR_SPEC_DIRS`, `PR_TICKET_RE`); exit 1 with none |

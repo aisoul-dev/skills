@@ -147,10 +147,10 @@ Use `xargs`, not a shell variable: zsh does not word-split variables.
 For each ratchet in the overlay:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/ratchet.sh" '<pattern>' -- <pathspec>...
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/ratchet.sh" [--code] '<pattern>' -- <pathspec>...
 ```
 
-It prints added, removed and net, and exits 0 (net down), 1 (even) or 2 (net up).
+It prints added, removed and net, and exits 0 (net down), 1 (even) or 2 (net up). Pass `--code` exactly when the overlay's command has it: it drops comments before counting.
 
 Report each gate's own counts (files, tests, errors); when a runner prints only a pass line, quote that line. A gate is red only on errors, test failures, conflicts, or a ratchet the branch moves the wrong way. A warning about the whole repository (a validator, an audit) counts only if the base does not show it too; otherwise it is _Non-blocking (pre-existing)_. A ratchet that stays even is one Non-blocking row with source _own_, when the overlay says every PR should move it. Each line the branch added that gets lint warnings becomes one Non-blocking row, source _own_, listing every rule that fires on it.
 

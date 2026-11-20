@@ -45,10 +45,10 @@ pnpm test --run
 
 ## Ratchets
 
-Explicit `any` must go down in every PR (net-negative); even is a Non-blocking row:
+Explicit `any` must go down in every PR (net-negative); even is a Non-blocking row. `--code` leaves comments out, so prose like "allows: any two" does not count:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/ratchet.sh" '(:|<|,|\bas)\s*any\b' -- '*.ts' '*.vue'
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr/ratchet.sh" --code '(:|<|,|\bas)\s*any\b' -- '*.ts' '*.vue'
 ```
 
 ## Constraints
