@@ -84,14 +84,29 @@ Findings come from up to three sources, each with its own source name in the led
 Run it as a separate headless session whose working directory is the review worktree. A `/code-review` started from this session, or from a subagent, forks from the directory the session started in, where the branch is not checked out, and sees an empty diff:
 
 ```bash
-BH="${TMPDIR:-/tmp}/bughunt-$(basename "$WT").md"
-(cd "$WT" && claude -p "/code-review <level> <base>" --allowedTools "Read,Grep,Glob,Bash(git:*)" > "$BH" 2>&1; echo "bughunt-exit: $?" >> "$BH")
+BH="${TMPDIR:-/tmp}/bughunt-$(basename "$WT")"
+(cd "$WT" && claude -p "/code-review <level> <base>" --output-format json --allowedTools "Read,Grep,Glob,Bash(git:*)" > "$BH.json" 2> "$BH.err"; echo "bughunt-exit: $?" > "$BH.exit")
 ```
 
-- **Start it in the background** (in Claude Code, the shell tool's `run_in_background`): it takes 20 minutes or more, longer than a foreground call may run. Meanwhile do the Spec source, the standards review and Step 4's gates, then read `$BH` when it ends and bring its findings into Step 3.
+- **Start it in the background** (in Claude Code, the shell tool's `run_in_background`): it takes 20 minutes or more, longer than a foreground call may run. `$BH.exit` appears when it ends.
+- **Fill the wait, and look in at least every 4 to 5 minutes.** Do the Spec source, the standards review, Step 4's gates and the merge risk meanwhile. Between those, and once they are done, check on it at least every 4 to 5 minutes: the prompt cache expires after 5 minutes, and a longer pause makes the next turn re-read the whole conversation at full price. When nothing else is left, wait in steps, not in one long call (give the call a timeout above the sleep):
+
+  ```bash
+  sleep 240; cat "$BH.exit" 2>/dev/null || echo "bug hunt still running"
+  ```
+
 - The headless session inherits `CLAUDE_CONFIG_DIR` and the API key from this one: nothing to pass.
-- **Read both parts of its output**: a JSON list of findings, then notes on what `/code-review` left off the list. Every listed finding goes to the ledger. A note is a lead for Step 3, not a dismissal: a contract change in an unmerged branch or a bypassed write guard in a note gets checked like a finding, and gets a row if it holds.
-- **When it gives nothing usable**, hunt yourself (below) and say under _Not checked_ which case it was: `$BH` has nothing but the exit line, the exit code is not 0, or the output says the diff is empty.
+- **Take the result and the cost from the JSON** when it ends:
+
+  ```bash
+  cat "$BH.exit"
+  jq -r '.result' "$BH.json"
+  jq -r '.is_error, .total_cost_usd' "$BH.json"
+  ```
+
+  Without `jq`, read the same keys with `python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["result"]); print(d.get("is_error"), d.get("total_cost_usd"))' "$BH.json"`. The cost goes into the reply (Step 6, part 2): this session's `/cost` does not include it.
+- **Read both parts of `result`**: a JSON list of findings, then notes on what `/code-review` left off the list. Every listed finding goes to the ledger. A note is a lead for Step 3, not a dismissal: a contract change in an unmerged branch or a bypassed write guard in a note gets checked like a finding, and gets a row if it holds.
+- **When it gives nothing usable**, hunt yourself (below) and say under _Not checked_ which case it was: the exit code in `$BH.exit` is not 0, `$BH.json` is empty or not JSON (then `$BH.err` says why), `is_error` is true, or `result` is empty or says the diff is empty. Report the cost even then, when the JSON has it.
 
 **Make sure it is the bug hunt.** The headless session sees the same skills as this one, and plugins can ship a skill with the same name. `code-review` from `mattpocock/skills`, for one, reviews standards and spec and does not hunt bugs, and it does not take a level. If several bug hunts answer to `code-review`, ask which to run, or use the overlay's choice. If the only one is not a bug hunt, run the own hunt below, and run that skill as the standards review if it is one. Never guess. Say under _Not checked_ which hunt ran when it was not the built-in one.
 
@@ -169,7 +184,7 @@ git diff --name-only --diff-filter=d <base>...HEAD | grep -E '\.(ts|tsx|js|vue)$
 git diff --name-only --diff-filter=d <base>...HEAD | xargs -r <pm> exec prettier --check --ignore-unknown
 ```
 
-Use `xargs`, not a shell variable: zsh does not word-split variables.
+Use `xargs`, not a shell variable: zsh does not word-split variables. In zsh, a colon right after a variable name starts a modifier (`:h`, `:t`, `:s` and more), so `"$ref:path"` is not the ref and a path: write `"${ref}:path"`, for example `git show "${ref}:src/app.ts"`.
 
 - When the full suite is long (a root script that chains many suites), run the part the diff touches and say which part. A gate not run goes under _Not checked_.
 
@@ -215,7 +230,7 @@ Verdict:
 Prose and the ledger in the user's language; comment blocks in the overlay's comment language, because they go to the PR.
 
 1. **Verdict**: one line with the verdict and one sentence why, then the merge risk headline from `pr-risk`. Directly under it, the merge conditions, or `Merge conditions: none`. A condition is something that must happen with or before this merge: an update from the base, merging together with a stacked branch that handles a finding. A stacked branch that handles nothing sets no condition.
-2. **Gates**: one line per gate with its result and counts, then a _Not checked:_ line.
+2. **Gates**: one line per gate with its result and counts, then a _Not checked:_ line, then the bug hunt's line: `Bug hunt: <n> findings, <m> notes, $<total_cost_usd> (headless session, not in this session's /cost)`, or the reason it gave nothing usable, with its cost when known.
 3. **Merge risk**: the `pr-risk` assessment as it came out, in its own format.
 4. **Ledger, every finding**: first one line for the spec, `Spec: <path or ticket>: R1 met, R2 partial, ...` or `Spec: none available`; then a table `#` | source (bug hunt / _standards_ / _spec_ / _own_ / _pr-risk_) | finding | `path:line` | status (Blocker / Non-blocking / Non-blocking (pre-existing) / Non-blocking (unconfirmed) / Handled in X / Dismissed) | why.
    - Every bug-hunt, standards and spec finding appears in at least one row, whole or split.
@@ -264,6 +279,7 @@ No paste-ready comments and no review summary.
 | Bug hunt on a branch that conflicts with the base | The most expensive step reviews code the conflict resolution will change |
 | Leaving a duplicate for later | The copies drift apart, and the next fix lands in only one of them |
 | Approving without the merge risk | A correct change that is a one-way door ships as if it were cheap to undo |
+| Waiting for the bug hunt in one long sleep | The prompt cache expires after 5 minutes, and the next turn re-reads the whole conversation at full price |
 | Running `/code-review` from this session or a subagent | It forks from the start directory, sees an empty diff and finds nothing, which reads like a clean branch |
 | Trusting the name `code-review` | A plugin skill with that name runs instead of the bug hunt, and nobody notices the bugs were never looked for |
 | Reviewing without the spec | Well-built code that does the wrong thing gets approved |
