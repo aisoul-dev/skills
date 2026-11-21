@@ -2,6 +2,13 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.7.0 (2026-11-21)
+
+### pr
+- `pr-review`: the headless bug hunt runs with `--output-format json`. The findings come from its `result`, and its `total_cost_usd` goes into the reply's Gates part, because the review session's `/cost` does not include the headless session. The exit code is kept in `bughunt-<worktree>.exit`, stderr in `.err`; a non-zero exit, `is_error`, an empty or non-JSON output or an empty diff still mean an own hunt.
+- `pr-review`: while the bug hunt runs, the wait is filled with the spec, standards, gates and merge risk, and the run is checked at least every 4 to 5 minutes, in `sleep 240` steps when nothing else is left: the prompt cache expires after 5 minutes.
+- `pr-review`: the zsh note now also covers modifiers: in `"$ref:path"` the colon starts a modifier (`:h`, `:t`, `:s`), so write `"${ref}:path"` (`git show "${ref}:src/app.ts"`).
+
 ## 1.6.0 (2026-11-21)
 
 ### pr
