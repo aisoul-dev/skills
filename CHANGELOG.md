@@ -2,6 +2,14 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.6.0 (2026-11-21)
+
+### pr
+- `pr-review` works in a review worktree of the reviewed commit, made in Step 1 next to the main checkout (`<repo>-review-<time>-<pid>`) and removed at the end; gates and ratchets run there. An overlay `Worktree` section replaces the recipe.
+- The bug hunt runs as a headless session in that worktree: `claude -p "/code-review <level> <base>" --allowedTools "Read,Grep,Glob,Bash(git:*)"`, in the background, output in `$TMPDIR/bughunt-<worktree>.md`. Called from the session or a subagent, `/code-review` forked from the start directory and saw an empty diff: on a real PR it returned nothing and the review fell back to a manual hunt, while the same command run in the worktree gave 10 findings in about 25 minutes.
+- Both parts of its output are triaged: the JSON findings, and the notes on what it left off the list, which are leads for the context checks, not dismissals. An empty output, a failed run or an empty diff means an own hunt, named under _Not checked_.
+- The overlay template's Bug hunt section holds only the level and the base.
+
 ## 1.5.1 (2026-11-20)
 
 ### pr

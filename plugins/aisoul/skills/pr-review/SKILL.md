@@ -23,7 +23,8 @@ If the repository has `.claude/aisoul/pr-review.md`, read it first. Its values r
 | Key | Default |
 |-----|---------|
 | Base | `origin/HEAD`, else `origin/main`, else `main` |
-| Bug hunt | Claude Code's built-in `/code-review` at `xhigh` against the base; otherwise Step 2's own hunt |
+| Bug hunt | Claude Code's built-in `/code-review` at `xhigh` against the base, run as a headless session in the review worktree; otherwise Step 2's own hunt |
+| Review worktree | a sibling of the main checkout, `<repo>-review-<time>-<pid>`, made in Step 1 |
 | Standards review | a standards and spec review skill, if one is installed (for example `code-review` from `mattpocock/skills`); none otherwise |
 | Spec folders | `docs/specs`, `specs`, `docs/superpowers/specs`, `.scratch`, `docs` |
 | Ticket pattern | `[A-Z][A-Z0-9]*-[0-9]+` |
@@ -58,17 +59,45 @@ Act on it before the bug hunt:
 
 In own-branch mode, tell the user to update from the base. Do not merge it yourself.
 
+### Review worktree
+
+Gates and the bug hunt run in a worktree of the reviewed commit, never in the checkout this session started in: that one may hold the user's work in progress, and its `HEAD` is usually the base, which gives an empty diff. Each run makes its own, so two runs at once do not share one:
+
+```bash
+top="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+WT="$top/../$(basename "$top")-review-$(date +%Y%m%d-%H%M%S)-$$"
+git worktree add --detach "$WT" <ref>
+```
+
+- `<ref>` is `origin/<branch>` for a pushed branch (Step 1 fetched it), the commit from `git fetch origin pull/<n>/head` for a GitHub PR number, and the local branch in own-branch mode. Uncommitted changes are not in the worktree: in own-branch mode ask the user to commit them first, or name them under _Not checked_.
+- Set up what the gates need there, the way the project does it (install dependencies).
+- Each shell call starts fresh: write the literal path of `$WT` into every later call that uses it. Load the overlay from the main checkout (in some repos `.claude/` is gitignored and missing from the worktree), then `cd` into the worktree.
+- At the end, remove only the path this run created (`git worktree remove --force <path>`). Another `*-review-*` worktree may belong to a run still going.
+- An overlay `Worktree` section replaces this recipe.
+
 ## Step 2: Find
 
 Findings come from up to three sources, each with its own source name in the ledger. Every subagent brief, here and in later steps, includes the line "Do not invoke any review skill (code-review, pr-review, pr-risk) unless this brief is to run that one skill": a subagent that starts its own review spawns more agents and duplicates the work.
 
-**Bug hunt** (source _bug hunt_, whoever ran it). By default, Claude Code's built-in `/code-review` with args `xhigh <base>`, unless the user named another level. Its output varies a lot from run to run: the same branch can return 15 findings once and 1 the next time.
+**Bug hunt** (source _bug hunt_, whoever ran it). By default, Claude Code's built-in `/code-review` with args `<level> <base>`: the level is `xhigh` unless the user or the overlay names another, the base is the overlay's. Its output varies a lot from run to run: the same branch can return 15 findings once and 1 the next time.
 
-**Make sure it is the bug hunt.** Plugins can ship a skill with the same name. `code-review` from `mattpocock/skills`, for one, reviews standards and spec and does not hunt bugs, and it does not take a level. If several bug hunts answer to `code-review`, ask which to run, or use the overlay's choice. If the only one is not a bug hunt, run the own hunt below, and run that skill as the standards review if it is one. Never guess. Say under _Not checked_ which hunt ran when it was not the built-in one.
+Run it as a separate headless session whose working directory is the review worktree. A `/code-review` started from this session, or from a subagent, forks from the directory the session started in, where the branch is not checked out, and sees an empty diff:
+
+```bash
+BH="${TMPDIR:-/tmp}/bughunt-$(basename "$WT").md"
+(cd "$WT" && claude -p "/code-review <level> <base>" --allowedTools "Read,Grep,Glob,Bash(git:*)" > "$BH" 2>&1; echo "bughunt-exit: $?" >> "$BH")
+```
+
+- **Start it in the background** (in Claude Code, the shell tool's `run_in_background`): it takes 20 minutes or more, longer than a foreground call may run. Meanwhile do the Spec source, the standards review and Step 4's gates, then read `$BH` when it ends and bring its findings into Step 3.
+- The headless session inherits `CLAUDE_CONFIG_DIR` and the API key from this one: nothing to pass.
+- **Read both parts of its output**: a JSON list of findings, then notes on what `/code-review` left off the list. Every listed finding goes to the ledger. A note is a lead for Step 3, not a dismissal: a contract change in an unmerged branch or a bypassed write guard in a note gets checked like a finding, and gets a row if it holds.
+- **When it gives nothing usable**, hunt yourself (below) and say under _Not checked_ which case it was: `$BH` has nothing but the exit line, the exit code is not 0, or the output says the diff is empty.
+
+**Make sure it is the bug hunt.** The headless session sees the same skills as this one, and plugins can ship a skill with the same name. `code-review` from `mattpocock/skills`, for one, reviews standards and spec and does not hunt bugs, and it does not take a level. If several bug hunts answer to `code-review`, ask which to run, or use the overlay's choice. If the only one is not a bug hunt, run the own hunt below, and run that skill as the standards review if it is one. Never guess. Say under _Not checked_ which hunt ran when it was not the built-in one.
 
 **Standards review** (source _standards_), when the overlay names one or one is installed: run it with the base as its fixed point. Keep its Standards findings; its Spec findings, if any, feed the Spec source below instead of being added twice. If the overlay names one that is not installed, or none runs, say so under _Not checked_. A breach of a documented standard can become an architectural Blocker in Step 5; a code smell is always Non-blocking.
 
-Without a `code-review` skill, hunt yourself: read the full diff, then for each changed function the callers and the tests that reach it, and look for broken flows, unhandled states and errors, and wrong assumptions about inputs. Use subagents per area for a large diff.
+Without a `code-review` skill, or when the headless run gave nothing usable, hunt yourself in the review worktree: read the full diff, then for each changed function the callers and the tests that reach it, and look for broken flows, unhandled states and errors, and wrong assumptions about inputs. Use subagents per area for a large diff.
 
 **Spec** (source _spec_): is it the change that was asked for?
 
@@ -113,7 +142,7 @@ It lists remote branches built on this branch's commits, each with its own chang
 
 ## Step 4: Mechanical gates and merge risk
 
-Take the gates from the first source that has them, and name the source in the Gates part of the reply:
+Run the gates and ratchets in the review worktree (Step 1), where `HEAD` is the reviewed commit. Take the gates from the first source that has them, and name the source in the Gates part of the reply:
 
 1. **The overlay's gates.**
 2. **CI config** (`.github/workflows/`, `.gitlab-ci.yml`, ...): run the same commands locally, as far as they run without CI's secrets or services.
@@ -235,6 +264,7 @@ No paste-ready comments and no review summary.
 | Bug hunt on a branch that conflicts with the base | The most expensive step reviews code the conflict resolution will change |
 | Leaving a duplicate for later | The copies drift apart, and the next fix lands in only one of them |
 | Approving without the merge risk | A correct change that is a one-way door ships as if it were cheap to undo |
+| Running `/code-review` from this session or a subagent | It forks from the start directory, sees an empty diff and finds nothing, which reads like a clean branch |
 | Trusting the name `code-review` | A plugin skill with that name runs instead of the bug hunt, and nobody notices the bugs were never looked for |
 | Reviewing without the spec | Well-built code that does the wrong thing gets approved |
 | Inventing requirements when no spec exists | The review argues with a spec only the reviewer imagined |
