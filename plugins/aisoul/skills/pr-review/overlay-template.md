@@ -12,7 +12,10 @@ need and the default applies. Keep the headings as they are.
 
 ## Bug hunt
 
-Claude Code's built-in `/code-review` with args `xhigh origin/main`, unless the user names another level. Not a plugin skill that shares the name.
+Level and base for Claude Code's built-in `/code-review`. How it runs (a headless session in the review worktree) is in the skill, not here.
+
+- Level: `xhigh`
+- Base: `origin/main`
 
 ## Standards review
 
