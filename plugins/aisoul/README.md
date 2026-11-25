@@ -2,7 +2,7 @@
 
 Grygorii Liashenko's skill set for Claude Code. Every skill is invoked as `/aisoul:<skill>`.
 
-The `pr` skills work on any stack: they take gates from the overlay, CI, the project's own instructions or its build files (`package.json`, `Makefile`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`), and their risk signals know JS/TS, Python, Go, Ruby, Rust, Java and shell. The `untangle` skills are for Nuxt / Vue / TypeScript only: their dependency rules encode a Nuxt layout and `surface.sh` needs `vue-tsc`.
+The `pr` and `retro` skills work on any stack: they take gates from the overlay, CI, the project's own instructions or its build files (`package.json`, `Makefile`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`), and their risk signals know JS/TS, Python, Go, Ruby, Rust, Java and shell. The `untangle` skills are for Nuxt / Vue / TypeScript only: their dependency rules encode a Nuxt layout and `surface.sh` needs `vue-tsc`.
 
 ## Skills
 
@@ -13,6 +13,9 @@ The `pr` skills work on any stack: they take gates from the overlay, CI, the pro
 | `/aisoul:pr-describe [branch \| --squash <sha>]` | pr | any | Writes a short, evidence-first PR description whose length follows the diff. Also triggers when you ask for a PR description. |
 | `/aisoul:pr-review [PR \| branch] [--own]` | pr | any | Reviews a branch for approval: scope, bug hunt, context checks, gates, merge risk, triage with proof, a ledger of every finding and paste-ready comments. `--own` returns a fix list instead. |
 | `/aisoul:pr-risk [PR \| branch \| --squash <sha>]` | pr | any | Assesses merge risk in five dimensions with evidence and one risk-lowering action each. Read-only; posts a PR comment only when asked. Also triggers when you ask how risky a PR is. |
+| `/aisoul:retro-audit [session \| --queue \| --last <n>]` | retro | any | Read-only. Reads agent session transcripts, finds the friction (corrections, failed attempts, long searches, costly calls) and writes a decision log of PR-sized fixes to the agent's environment to `docs/retro/`. Changes nothing. |
+| `/aisoul:retro-fix <log path> <fix id>` | retro | any | Applies one fix from a retro log as one branch and one PR, after proving it would have caught the session's case; separate review, log update. |
+| `/aisoul:retro-curate [--days <n>]` | retro | any | Read-only. Periodic pruning of unused or overlapping skills, bloated skills, noisy checks and steering lines a check now covers. Writes a log for `retro-fix`. |
 
 Skills are named `<group>-<action>` so related ones sort together in `/` completion. Heavy workflows run only when you call them (`disable-model-invocation: true`).
 
@@ -108,9 +111,56 @@ Env: `UNTANGLE_SINCE` (default `6 months ago`), `UNTANGLE_OUT`, `UNTANGLE_TOP`, 
 
 Nothing is installed into the audited project and no config is written there.
 
+
+## retro
+
+Turn friction in coding-agent sessions into changes to what the next session starts with, so it cannot happen again. Not a memory system: it does not record what happened, it changes checks, review standards, skills and pointers.
+
+### Finding kinds
+
+| ID | Kind | Default fix |
+|----|------|-------------|
+| G | Guardrail gap: a check could have caught it, or one exists but is not wired | lint rule, type, test, hook, CI job |
+| S | Standard missed: a judgement call review did not catch | a rule in the reviewer's standards |
+| P | Procedure: found only after failed attempts, or a skill misled or did not load | a skill patch |
+| N | Navigation: a long search for a file or a fact | a pointer in a file the agent already reads |
+| A | Access: information the agent could not reach | a log file, a script, read-only access |
+| T | Tool economy: expensive calls that returned little | a narrower call or a cheaper tool |
+| X | Steering debt: steering lines that change nothing or belong in a check | delete or move |
+
+Every finding is routed down one ladder: a deterministic check first, then a reviewer standard, then a skill patch, then a pointer, and an always-loaded steering line only with a reason the others fail. Every finding cites the transcript line it comes from (`<session>:L<n>`), and an independent pass confirms each one before it reaches the log. `retro-fix` proves a fix against the session's case before it lands: a new check must fail on the old mistake, a reordered skill is replayed in a headless session.
+
+### Collecting sessions
+
+The plugin registers a `SessionEnd` hook (`scripts/retro/collect.mjs`) that does nothing until you opt in, per Claude Code config directory:
+
+```bash
+mkdir -p "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/aisoul"
+touch "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/aisoul/retro-collect"
+```
+
+From then on, a session with friction (15+ tool calls, 2+ tool errors, 4+ messages from you, or any interruption) is appended to `${CLAUDE_CONFIG_DIR}/aisoul/retro-queue.tsv`. The hook runs no model and touches no project; `/aisoul:retro-audit --queue` picks the queue up for the current project and removes what it handled. Separate config directories keep separate queues and see only their own sessions. Opt out by deleting the file. Where an organization's policy turns off plugin hooks, the queue stays empty; `--last <n>` works without it. Env: `RETRO_MIN_TOOLS`, `RETRO_MIN_ERRORS`, `RETRO_MIN_HUMAN`, `RETRO_IGNORE` (regex on the session directory), `AISOUL_RETRO_SKIP=1` for headless runs that should never be queued.
+
+### Scripts
+
+`scripts/retro/` reads Claude Code transcripts (`$CLAUDE_CONFIG_DIR/projects/**/*.jsonl`). It needs Node 18+ and nothing else. The transcript format is not a public contract, so the reader skips anything it does not recognise instead of failing.
+
+| Script | What it does |
+|--------|--------------|
+| `sessions.mjs [--cwd <dir>] [--all] [--limit <n>]` | newest sessions of a project: last activity, tool calls, tool errors, human messages, path |
+| `sessions.mjs --queue` / `--drop <transcript>` | the collector's queue for this project, and removing handled sessions |
+| `signals.mjs <transcript> [...]` | human messages, interruptions, tool errors, repeated commands, reads before the first edit, re-reads, edit churn, large results, compactions and skill use, each with its line (`RETRO_LARGE`, `RETRO_REPEAT`, `RETRO_REREAD`, `RETRO_CHURN`) |
+| `usage.mjs [--days <n>] [name ...]` | uses, sessions and last use per skill and slash command; named skills with no use are listed as 0 |
+| `collect.mjs` | the `SessionEnd` hook above |
+
+Overlay: `skills/retro-audit/overlay-template.md` to `.claude/aisoul/retro-audit.md`: log folder, standards file, where skills are maintained, extra steering files, guardrail commands. All three retro skills read it.
+
+Transcripts hold private code and messages. The skills quote at most one short line per evidence point, never secrets, and a fix aimed at a shared skills repo carries no project specifics.
+
 ## Credits
 
 - **untangle**: inspired by [caldoai/skills `untangle-codebase`](https://github.com/caldoai/skills) (MIT). The taxonomy, metrics, scripts and workflow here are independent. Background reading is listed at the end of the audit skill.
 - **pr-describe**: ideas taken from Hugo RCD's [What my pull requests look like now](https://hugorcd.com/writing/what-my-pull-requests-look-like-now): evidence chosen by change type, an order the reader can stop at, "before" from the base branch, demo data only, one line on what was not checked. The size rule, word budgets, scripts and overlay are ours.
 - **pr-review**: generalised from the author's own project review skill; every project-specific value moved to the overlay. The Spec check's search order and its three kinds of spec findings come from Matt Pocock's [`code-review`](https://github.com/mattpocock/skills) (MIT), which `pr-review` can also run as its standards review.
 - **pr-risk**: inspired by Warp's [`merge-risk`](https://github.com/warpdotdev/common-skills) (MIT), which credits Matt Pocock's `pr` skill. The idea of rating alignment, impact, verification, rollback cost and error detection comes from there; the wording, the rule-based overall risk, the "Lower it" actions, the self-check mode, the facts script and the overlay are ours.
+- **retro**: the environment-over-memory idea, the categories behind G, S, N, A, T and X, and the mechanical-versus-judgement split come from Matt Pocock's [`retro`](https://github.com/mattpocock/skills) (MIT). The skill patch order, never keeping environment failures or one-off details, and periodic curation come from the learning loop in Nous Research's [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT). The routing ladder, evidence rule, proofs, scripts, collector and audit/fix split are ours, the last after `untangle`.

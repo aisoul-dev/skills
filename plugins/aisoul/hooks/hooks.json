@@ -1,0 +1,16 @@
+{
+  "description": "retro: queues sessions with friction for /aisoul:retro-audit. Inert until opted in per config directory (see the retro section of the plugin README).",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/retro/collect.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

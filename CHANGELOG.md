@@ -2,6 +2,15 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.8.0 (2026-11-26)
+
+### retro (new)
+- `retro-audit`: a read-only retrospective on one or more agent sessions. It reads the transcripts, finds the friction and writes a decision log of PR-sized fixes to the agent's environment, routed down one ladder: a deterministic check, a reviewer standard, a skill patch, a pointer, and an always-loaded steering line only with a reason. Every finding cites its transcript line and is confirmed by an independent pass. Changes nothing.
+- `retro-fix`: applies one fix from the log as one PR, after proving it against the session's case (a new check fails on the old mistake, a reordered skill is replayed headless). Targets outside the project (a skills repo, a global steering file) get no project specifics.
+- `retro-curate`: read-only periodic pruning of what retro and you added: unused or overlapping skills, bloat, noisy checks, steering lines a check now covers.
+- `scripts/retro/`: `sessions.mjs`, `signals.mjs`, `usage.mjs` and the `collect.mjs` SessionEnd hook, with tests on a synthetic config directory (`tests/retro.sh`, run in CI).
+- The plugin ships its first hook (`hooks/hooks.json`). It is inert until a user opts in per config directory and always exits 0.
+
 ## 1.7.0 (2026-11-21)
 
 ### pr
