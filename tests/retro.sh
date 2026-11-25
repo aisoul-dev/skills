@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016  # backticks in the expected output are literal
 # Tests for the retro transcript scripts on a synthetic Claude Code config
 # directory. No model is run and nothing outside a temp folder is touched.
 set -euo pipefail
@@ -18,33 +19,33 @@ mkdir -p "$PROJ/sub" "$CLAUDE_CONFIG_DIR/projects/p1" "$CLAUDE_CONFIG_DIR/projec
 # One event per line, in the shape Claude Code writes. Line numbers matter:
 # the assertions below cite them.
 A="$CLAUDE_CONFIG_DIR/projects/p1/sess-a.jsonl"
-u()  { printf '{"type":"user","cwd":"%s","gitBranch":"feat/x","timestamp":"%s","message":{"role":"user","content":%s}}\n' "$1" "$2" "$3"; }
-tu() { printf '{"type":"assistant","cwd":"%s","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","id":"%s","name":"%s","input":%s}]}}\n' "$PROJ" "$1" "$2" "$3" "$4"; }
-tr() { printf '{"type":"user","cwd":"%s","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"%s","is_error":%s,"content":%s}]}}\n' "$PROJ" "$1" "$2" "$3" "$4"; }
+ev_user() { printf '{"type":"user","cwd":"%s","gitBranch":"feat/x","timestamp":"%s","message":{"role":"user","content":%s}}\n' "$1" "$2" "$3"; }
+ev_call() { printf '{"type":"assistant","cwd":"%s","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","id":"%s","name":"%s","input":%s}]}}\n' "$PROJ" "$1" "$2" "$3" "$4"; }
+ev_result() { printf '{"type":"user","cwd":"%s","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"%s","is_error":%s,"content":%s}]}}\n' "$PROJ" "$1" "$2" "$3" "$4"; }
 big="$(printf 'x%.0s' $(seq 1 25000))"
 {
-  u "$PROJ" 2026-11-20T10:00:00Z '"add the export button"'                                     # L1
-  tu 2026-11-20T10:01:00Z t1 Grep '{"pattern":"ExportButton"}'                                   # L2
-  tr 2026-11-20T10:01:01Z t1 false '"no matches"'                                                # L3
-  tu 2026-11-20T10:02:00Z t2 Read '{"file_path":"/w/app/a.ts"}'                                   # L4
-  tr 2026-11-20T10:02:01Z t2 false '"code"'                                                      # L5
-  tu 2026-11-20T10:03:00Z t3 Read '{"file_path":"/w/app/a.ts"}'                                   # L6
-  tr 2026-11-20T10:03:01Z t3 false '"code"'                                                      # L7
-  tu 2026-11-20T10:04:00Z t4 Read '{"file_path":"/w/app/a.ts"}'                                   # L8
-  tr 2026-11-20T10:04:01Z t4 false "\"$big\""                                                    # L9
-  tu 2026-11-20T10:05:00Z t5 Bash '{"command":"pnpm test"}'                                      # L10
-  tr 2026-11-20T10:05:01Z t5 true '"1 failed"'                                                   # L11
-  tu 2026-11-20T10:06:00Z t6 Bash '{"command":"pnpm  test"}'                                     # L12
-  tr 2026-11-20T10:06:01Z t6 true '[{"type":"text","text":"1 failed again"}]'                   # L13
-  u "$PROJ" 2026-11-20T10:07:00Z '"no, credentials include only on the handshake call"'        # L14
-  tu 2026-11-20T10:08:00Z t7 Edit '{"file_path":"/w/app/a.ts"}'                                   # L15
-  tr 2026-11-20T10:08:01Z t7 false '"ok"'                                                        # L16
-  tu 2026-11-20T10:09:00Z t8 Bash '{"command":"pnpm test"}'                                      # L17
-  tr 2026-11-20T10:09:01Z t8 false '"passed"'                                                    # L18
-  tu 2026-11-20T10:10:00Z t9 Skill '{"skill":"aisoul:pr-describe"}'                              # L19
-  tr 2026-11-20T10:10:01Z t9 false '"loaded"'                                                    # L20
-  u "$PROJ" 2026-11-20T10:11:00Z '"<command-name>/aisoul:pr-risk</command-name>"'              # L21
-  u "$PROJ" 2026-11-20T10:12:00Z '"[Request interrupted by user]"'                              # L22
+  ev_user "$PROJ" 2026-11-20T10:00:00Z '"add the export button"'                                     # L1
+  ev_call 2026-11-20T10:01:00Z t1 Grep '{"pattern":"ExportButton"}'                                   # L2
+  ev_result 2026-11-20T10:01:01Z t1 false '"no matches"'                                                # L3
+  ev_call 2026-11-20T10:02:00Z t2 Read '{"file_path":"/w/app/a.ts"}'                                   # L4
+  ev_result 2026-11-20T10:02:01Z t2 false '"code"'                                                      # L5
+  ev_call 2026-11-20T10:03:00Z t3 Read '{"file_path":"/w/app/a.ts"}'                                   # L6
+  ev_result 2026-11-20T10:03:01Z t3 false '"code"'                                                      # L7
+  ev_call 2026-11-20T10:04:00Z t4 Read '{"file_path":"/w/app/a.ts"}'                                   # L8
+  ev_result 2026-11-20T10:04:01Z t4 false "\"$big\""                                                    # L9
+  ev_call 2026-11-20T10:05:00Z t5 Bash '{"command":"pnpm test"}'                                      # L10
+  ev_result 2026-11-20T10:05:01Z t5 true '"1 failed"'                                                   # L11
+  ev_call 2026-11-20T10:06:00Z t6 Bash '{"command":"pnpm  test"}'                                     # L12
+  ev_result 2026-11-20T10:06:01Z t6 true '[{"type":"text","text":"1 failed again"}]'                   # L13
+  ev_user "$PROJ" 2026-11-20T10:07:00Z '"no, credentials include only on the handshake call"'        # L14
+  ev_call 2026-11-20T10:08:00Z t7 Edit '{"file_path":"/w/app/a.ts"}'                                   # L15
+  ev_result 2026-11-20T10:08:01Z t7 false '"ok"'                                                        # L16
+  ev_call 2026-11-20T10:09:00Z t8 Bash '{"command":"pnpm test"}'                                      # L17
+  ev_result 2026-11-20T10:09:01Z t8 false '"passed"'                                                    # L18
+  ev_call 2026-11-20T10:10:00Z t9 Skill '{"skill":"aisoul:pr-describe"}'                              # L19
+  ev_result 2026-11-20T10:10:01Z t9 false '"loaded"'                                                    # L20
+  ev_user "$PROJ" 2026-11-20T10:11:00Z '"<command-name>/aisoul:pr-risk</command-name>"'              # L21
+  ev_user "$PROJ" 2026-11-20T10:12:00Z '"[Request interrupted by user]"'                              # L22
   printf '{"type":"user","isMeta":true,"cwd":"%s","message":{"role":"user","content":"skill text"}}\n' "$PROJ"   # L23
   printf '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"s1","name":"Bash","input":{"command":"ls"}}]}}\n'  # L24
   printf '{"type":"system","subtype":"compact_boundary"}\n'                                     # L25
@@ -53,11 +54,11 @@ big="$(printf 'x%.0s' $(seq 1 25000))"
 
 # A second project, and a session in a subfolder of the first.
 B="$CLAUDE_CONFIG_DIR/projects/p1/sess-b.jsonl"
-u "$TMP/elsewhere" 2026-11-21T09:00:00Z '"hello"' > "$B"
+ev_user "$TMP/elsewhere" 2026-11-21T09:00:00Z '"hello"' > "$B"
 C="$CLAUDE_CONFIG_DIR/projects/p2/sess-c.jsonl"
-u "$PROJ/sub" 2026-11-21T09:00:00Z '"in a subfolder"' > "$C"
+ev_user "$PROJ/sub" 2026-11-21T09:00:00Z '"in a subfolder"' > "$C"
 # Subagent files in a session folder are not sessions of their own.
-u "$PROJ" 2026-11-21T09:00:00Z '"subagent"' > "$CLAUDE_CONFIG_DIR/projects/p2/sess-a/agent.jsonl"
+ev_user "$PROJ" 2026-11-21T09:00:00Z '"subagent"' > "$CLAUDE_CONFIG_DIR/projects/p2/sess-a/agent.jsonl"
 
 ### signals
 sig="$(node "$SCRIPTS/signals.mjs" "$A")"
