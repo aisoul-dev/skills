@@ -1,6 +1,6 @@
 # aisoul skills
 
-A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`. The `pr` skills work on any stack; the `untangle` skills are for Nuxt / Vue / TypeScript.
+A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`. The `pr` and `retro` skills work on any stack; the `untangle` skills are for Nuxt / Vue / TypeScript.
 
 | Skill | Stack | What it does |
 |-------|-------|--------------|
@@ -9,6 +9,9 @@ A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every 
 | `/aisoul:pr-describe` | any | Short, evidence-first PR description sized to the diff |
 | `/aisoul:pr-risk` | any | Merge-risk assessment in five dimensions, for a reviewer or as a self-check |
 | `/aisoul:pr-review` | any | Branch review with a verdict: bug hunt, context checks, gates, merge risk, paste-ready comments |
+| `/aisoul:retro-audit` | any | Retrospective on agent sessions, writes a decision log of fixes to the agent's environment |
+| `/aisoul:retro-fix` | any | Applies one fix from that log as one small PR, proven against the session's case |
+| `/aisoul:retro-curate` | any | Periodic pruning: unused or overlapping skills, bloat, noisy checks, steering debt |
 
 Details: [plugins/aisoul](plugins/aisoul).
 
@@ -58,6 +61,7 @@ plugins/aisoul/
   .claude-plugin/plugin.json        manifest: name, version, description
   skills/<group>-<action>/SKILL.md  invoked as /aisoul:<group>-<action>
   scripts/<group>/                  helpers, referenced as ${CLAUDE_PLUGIN_ROOT}/scripts/<group>/...
+  hooks/hooks.json                  plugin hooks (inert until a user opts in)
   README.md                         skill list and per-group docs
 tests/                              smoke tests for plugin scripts
 ```
@@ -69,6 +73,7 @@ tests/                              smoke tests for plugin scripts
 - **Scripts live in `scripts/<group>/`**, never at the plugin root, so groups do not collide.
 - **Every change to the plugin bumps its `version`** in `plugin.json` (semver) and adds a line to [CHANGELOG.md](CHANGELOG.md). Installed copies are cached per version, so an unbumped change may not reach users.
 - **Scripts never install into the target project.** Use `pnpm dlx` / `npx`, write to `/tmp`.
+- **Hooks do nothing until the user opts in.** A plugin hook runs for everyone who installs the plugin; it checks an opt-in first and always exits 0.
 - **No em dashes** in skill text.
 - **The marketplace name `aisoul` and the plugin name `aisoul` do not change.** They are stored in every install; renaming breaks updates. Moving the repo is fine, GitHub redirects.
 
@@ -89,6 +94,7 @@ bash tests/smoke.sh
 bash tests/pr.sh
 bash tests/pr-risk.sh
 bash tests/pr-review.sh
+bash tests/retro.sh
 shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
 ```
 

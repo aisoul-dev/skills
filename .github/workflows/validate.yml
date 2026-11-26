@@ -36,6 +36,7 @@ jobs:
           bash tests/pr.sh
           bash tests/pr-risk.sh
           bash tests/pr-review.sh
+          bash tests/retro.sh
 
       - name: No em dashes in skills and docs
         run: |
