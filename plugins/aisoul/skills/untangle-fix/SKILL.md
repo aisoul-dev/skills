@@ -24,7 +24,9 @@ The log may be stale. At HEAD, check that every finding the fix claims to resolv
 
 ## 2. Baseline
 
-Run typecheck (`pnpm nuxt typecheck` or the repo's script), lint and unit tests. Count patches in the files the fix will touch:
+Find the stack adapter: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/adapter.sh"` (the audit log names it too). Its reference lists the typecheck, lint and test commands and how to pin behavior in this stack; without an adapter, use the repo's own scripts.
+
+Run typecheck, lint and unit tests. Count patches in the files the fix will touch:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/patches.sh" <file> <file> ...
@@ -34,7 +36,7 @@ If the baseline is red, stop and report: pre-existing failures must not blend in
 
 ## 3. Pin behavior first
 
-If the behavior the fix touches has no test, write one and see it pass on the old code before changing anything. Test the way the code is used: component props, emits and rendered output; composable inputs and returned values; store actions and resulting state. Never assert on private functions or call counts of internals.
+If the behavior the fix touches has no test, write one and see it pass on the old code before changing anything. Test the way the code is used, through its public interface: inputs and what comes out, the state a caller can observe. Never assert on private functions or call counts of internals. The adapter's reference has stack examples.
 
 ## 4. Implement only this fix
 
@@ -58,7 +60,7 @@ Tests (touched tests only, do this last):
 
 - Same checks as the baseline: all green.
 - Patch count in touched files went down (rerun `patches.sh` on the same files), or the log says why not.
-- If the audit used dependency rules, rerun `bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/deps.sh"`: no new violations.
+- If the audit had dependency rules (an adapter with a deps step), rerun `bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/deps.sh"`: no new violations.
 - Respect repo ratchets (e.g. net-negative explicit `any` per PR).
 - `git diff --stat`: nothing outside the fix scope.
 

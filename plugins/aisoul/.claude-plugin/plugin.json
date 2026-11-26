@@ -1,7 +1,7 @@
 {
   "name": "aisoul",
-  "version": "1.8.0",
-  "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring), pr-describe (evidence-first PR descriptions), pr-risk (merge-risk assessment), pr-review (branch review with a verdict) and retro (session retrospectives that turn agent friction into checks, standards and skill fixes).",
+  "version": "1.9.0",
+  "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring, with stack adapters), pr-describe (evidence-first PR descriptions), pr-risk (merge-risk assessment), pr-review (branch review with a verdict) and retro (session retrospectives that turn agent friction into checks, standards and skill fixes).",
   "author": {
     "name": "Grygorii Liashenko",
     "url": "https://aisoul.dev"

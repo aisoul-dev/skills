@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Dead weight: unused files, exports and dependencies via knip.
-# Every hit must be verified by grep before it becomes a finding:
-# resolveComponent, <component :is>, string lookups, server routes and
-# test-only usage give false positives. Writes $OUT/knip.txt.
+# Dead weight: runs the active adapter's deadweight.sh (see adapters/README.md).
+# Without an adapter for this stack, or without this step in it, it writes
+# an UNVERIFIED line to $OUT/deadweight.txt and exits 0: the audit then finds these
+# by reading and says so in the log.
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib.sh
 source "$(dirname "$0")/lib.sh"
 
-set +e
-run_dlx knip --reporter compact --no-exit-code > "$OUT/knip.txt" 2>&1
-status=$?
-set -e
+if [ -n "$ADAPTER_DIR" ] && [ -f "$ADAPTER_DIR/deadweight.sh" ]; then
+  exec bash "$ADAPTER_DIR/deadweight.sh" "$@"
+fi
 
-echo "deadweight: exit $status, $(wc -l < "$OUT/knip.txt") lines -> $OUT/knip.txt"
+echo "UNVERIFIED: adapter '$ADAPTER' has no deadweight step for this stack; find these by reading" | tee "$OUT/deadweight.txt"

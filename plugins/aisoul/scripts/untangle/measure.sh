@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
 # Run every untangle measurement and print a summary.
-# Git-based measurements run first; the ones that download tools run last and
-# never stop the run if they fail.
+# Git-based measurements run first; the adapter's steps (which may download
+# tools) run last and never stop the run if they fail.
 #
 #   measure.sh                 # default paths
 #   measure.sh app/features/x  # scoped
-#   UNTANGLE_SKIP_NET=1 measure.sh   # skip knip and dependency-cruiser
+#   UNTANGLE_SKIP_NET=1 measure.sh   # git and grep only, skip the adapter's tools
+#   UNTANGLE_ADAPTER=none measure.sh # force the stack-neutral core
+#
+# Exit: 0, or 3 on a shallow clone (history measurements would be empty).
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=SCRIPTDIR/lib.sh
+source "$DIR/lib.sh"
+
+echo "== adapter: $ADAPTER"
+echo "$ADAPTER" > "$OUT/adapter.txt"
+require_history
 
 echo "== locality";  bash "$DIR/locality.sh" "$@" || echo "locality failed"
 echo "== churn";     bash "$DIR/churn.sh" "$@"    || echo "churn failed"

@@ -1,6 +1,6 @@
 ---
 name: untangle-audit
-description: Read-only structural audit of a Nuxt/Vue/TS codebase or one area: finds change coupling, wrong dependency direction, shallow modules, dead weight and patches, writes a decision log of PR-sized fixes. Changes no code.
+description: Read-only structural audit of a codebase or one area, any stack (a stack adapter adds the dependency graph and dead code; Nuxt/Vue/TS is built in): finds change coupling, wrong dependency direction, shallow modules, dead weight and patches, writes a decision log of PR-sized fixes. Changes no code.
 argument-hint: "[path or concern]"
 disable-model-invocation: true
 ---
@@ -31,12 +31,14 @@ The two headline metrics:
 
 - Scope: use the argument if given. Otherwise ask once: whole repo or which area.
 - Log path: `docs/untangle/<scope>-<YYYY-MM-DD>.md`, unless the repo already has a place for specs/plans. If the repo requires a ticket before a branch, write the log without committing and say so.
-- Nothing is installed into the project: scripts use `pnpm dlx` (or `npx`), outputs go to `/tmp/untangle/`. Do NOT add devDependencies or commit tool configs.
-- Run `pnpm nuxt prepare` first so `.nuxt/` types and path aliases exist.
+- Nothing is installed into the project: tools run through one-off runners (`pnpm dlx`, `npx`), outputs go to `/tmp/untangle/`. Do NOT add dependencies or commit tool configs.
+- **Stack adapter.** Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/adapter.sh"`. It prints the adapter for this repo and its reference file, or `none`. Read the reference now: its prepare step (run it before measuring), the typecheck, lint and test commands, tool caveats, and what each finding kind looks like in this stack. With `none`, the git and patch measurements still work; dependency direction and dead weight are found by reading, and the log says so.
 
 ## 1. Measure (scripts first, judgement later)
 
-Run from the repo root. Every script accepts optional paths (default: existing `app/ server/ shared/ src/`). Env: `UNTANGLE_SINCE` (default `6 months ago`), `UNTANGLE_OUT` (default `/tmp/untangle`).
+Run from the repo root. Every script accepts optional paths (default: the adapter's source folders that exist, `src/ lib/ app/` without an adapter, else the whole repo). Env: `UNTANGLE_SINCE` (default `6 months ago`), `UNTANGLE_OUT` (default `/tmp/untangle`), `UNTANGLE_ADAPTER` (force an adapter, or `none`).
+
+The history measurements refuse a shallow clone (exit 3): in CI, check out with `fetch-depth: 0`.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/measure.sh"                          # whole repo
@@ -51,55 +53,55 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/measure.sh" app/components/orgchart
 | `churn.sh` | `churn.txt` | hot files: where a fix pays back fastest |
 | `cochange.sh` | `cochange.txt` | pair that co-changes but lives apart: C candidate. Hot file co-changing with many unrelated files: does too much (D or M) |
 | `patches.sh` | `patches.txt` + counts | P candidates by label; counts are the patch baseline |
-| `deps.sh` | `depcruise.txt` | D findings: cycles, utils importing UI, logic importing components, shared importing app |
-| `deadweight.sh` | `knip.txt` | W candidates |
-| `surface.sh` (optional, not in `measure.sh`) | `surface/*.d.ts` | the whole public API in context, for the big picture |
+| `deps.sh` | `deps.txt` | adapter step. D findings: dependency rule violations and cycles |
+| `deadweight.sh` | `deadweight.txt` | adapter step. W candidates |
+| `surface.sh` (optional, not in `measure.sh`) | `surface/` | adapter step. The whole public API in context, for the big picture |
 
 Caveats:
-- `knip`: verify every hit with grep before it becomes a finding. `resolveComponent`, `<component :is>`, string lookups, server routes and test-only usage give false positives.
-- `deps.sh`: auto-imported components and composables have no import statement, so the graph misses them. For each composable and store in scope, list consumers with grep (`grep -rn "useXxx(" app/`). If `.vue` files show zero dependencies, the SFC parser was not resolved: do not fix it, rely on grep for `.vue` and note it in the log.
+- An adapter step the stack has no adapter for writes a line starting with `UNVERIFIED`. Then find those kinds by reading and grep in step 2, and write `UNVERIFIED (no adapter)` in the log header instead of a count.
+- Every dead weight hit is a candidate: verify it with grep before it becomes a finding. The adapter's reference lists the tool's known false positives.
 - `patches.sh` only finds candidates. Multi-line swallowed errors, guard flags and one-caller parameters are found by reading, in step 2.
 - `surface.sh`: if nothing is emitted, skip it and use subagent summaries per area.
 
 ## 2. Find (no fixes yet)
 
-Split the scope into areas (by feature or top-level folder). Give each subagent its area, the files in `/tmp/untangle/` and the guide below. Each returns findings with `file:line` evidence.
+Split the scope into areas (by feature or top-level folder). Give each subagent its area, the files in `/tmp/untangle/`, the guide below and the adapter's reference (its "What the kinds look like here" section). Each returns findings with `file:line` evidence.
 
 **C. Change coupling**: knowledge that lives in more than one place, so changing it means finding all copies.
-- the same mapping, validation or option-building logic written twice (two components each build the same select options)
+- the same mapping, validation or option-building logic written twice
 - one concept with two shapes: one feature sends a business ID, another sends a UUID for the same field
-- implicit execution order: a plugin must init before a middleware reads its state; a watcher relies on another watcher having run
-- shared mutable state with no owner: module-level `let` in a composable, `provide`/`inject` with string keys, `window` events, ad-hoc event buses
-- parents driving children through template refs and `defineExpose` instead of props and emits
+- implicit execution order: one module must initialise before another reads its state
+- shared mutable state with no owner: module-level variables, global events, string-keyed registries
+- a caller reaching into another module's internals instead of using its interface
 - pairs from `cochange.txt` that live apart and have no explicit link
 
 **D. Dependency direction**: a module knows something it should not need to know.
-- leaf UI components that import stores or call the API directly
-- utils that read stores or runtime config
-- business rules inside pages, needed by another page
+- presentation code that reaches into state or the network directly
+- low-level helpers that read configuration or application state
+- business rules inside an entry point (a page, a controller, a handler), needed by another one
 - a stable module importing a feature module
-- anything in `depcruise.txt`
+- anything in `deps.txt`
 
 **M. Shallow modules**: the interface costs about as much as the implementation saves.
-- a component that only forwards props to a UI library component
-- a composable that wraps one call and adds nothing
-- props drilled through 3+ levels that nothing in between uses
+- a wrapper that only forwards to another module
+- a function or class that wraps one call and adds nothing
+- data passed through 3+ layers that nothing in between uses
 - a function with so many options that callers effectively re-implement it through config
 
 **W. Dead weight**: exists without a current reason.
-- verified `knip.txt` hits: unused files, exports, dependencies
-- props and options nobody passes, abstraction layers with a single implementation "for later"
-- store state nobody reads, feature flags that are always on
-- hand-written types that duplicate generated API types
+- verified `deadweight.txt` hits: unused files, exports, dependencies
+- parameters and options nobody passes, abstraction layers with a single implementation "for later"
+- state nobody reads, feature flags that are always on
+- hand-written types or schemas that duplicate generated ones
 
 **P. Patches**: code that exists because the design does not handle a case on its own.
 - branches on one specific id, name or route
 - a parameter added for exactly one caller
-- swallowed errors: empty catch, `.catch(() => {})`, catch that only logs and continues
-- timing fixes: `setTimeout`, `nextTick`, retries used to win a race
-- type escapes: `@ts-ignore`, `as any`, `eslint-disable`
+- swallowed errors: an empty catch, a catch that only logs and continues
+- timing fixes: sleeps, timeouts and retries used to win a race
+- type and lint escapes: ignore comments, casts to an any-type
 - skipped or disabled tests
-- guard flags that stop watcher loops or double fetches
+- guard flags that stop loops or double execution
 
 Rule: no evidence, no entry. Every finding cites `file:line` or a measurement line. A finding can belong to two kinds; pick the one whose fix is cheaper to explain.
 
@@ -122,9 +124,10 @@ Spawn a fresh subagent that has NOT seen the log. Give it only the scope and the
 ```markdown
 # Untangle audit: <scope> (<YYYY-MM-DD>, <sha>)
 
+Adapter: nuxt
 Locality: median <N> files/commit, p90 <N> (<N> commits, 6 months)
 Patches: <N> (timing 7, type-escape 23, swallowed-error 4, ...)
-Dependency rule violations: <N>. Dead weight (verified): <N>.
+Dependency rule violations: <N>, or UNVERIFIED (no adapter). Dead weight (verified): <N>, or UNVERIFIED (no adapter).
 Regenerate: bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/measure.sh" <scope>
 
 ## Fixes (by payback)
@@ -133,7 +136,7 @@ Regenerate: bash "${CLAUDE_PLUGIN_ROOT}/scripts/untangle/measure.sh" <scope>
 Resolves: C1, D3, P2, P4
 Change: ...
 Rejected: <alternative>, because ...
-Files: ~4 (app/composables/useX.ts, ...)
+Files: ~4 (src/orders/pricing.ts, ...)
 Behavior risk: low. Manual check: ...
 After: none
 
@@ -151,7 +154,7 @@ Cost: ...
 
 - Every finding has evidence and either a fix or a justification.
 - Every fix fits one PR (S or M).
-- Locality and patch baselines recorded.
+- Locality and patch baselines recorded, and the adapter (or `none`) named.
 - The independent pass added nothing material.
 - `git status` shows only the log (or nothing). No source file changed.
 

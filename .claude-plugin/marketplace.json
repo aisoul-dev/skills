@@ -1,6 +1,6 @@
 {
   "name": "aisoul",
-  "description": "aisoul skills for Claude Code: PR descriptions, merge risk, branch review and session retrospectives for any stack, plus structural audits and refactoring for Nuxt / Vue / TypeScript.",
+  "description": "aisoul skills for Claude Code, any stack: PR descriptions, merge risk, branch review, session retrospectives, and structural audits with refactoring (stack adapters, Nuxt / Vue / TypeScript built in).",
   "owner": {
     "name": "Grygorii Liashenko (aisoul)",
     "url": "https://aisoul.dev"
@@ -9,7 +9,7 @@
     {
       "name": "aisoul",
       "source": "./plugins/aisoul",
-      "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring), pr-describe (evidence-first PR descriptions), pr-risk (merge-risk assessment), pr-review (branch review with a verdict) and retro (session retrospectives that turn agent friction into checks, standards and skill fixes).",
+      "description": "Grygorii Liashenko's skill set: untangle (structural audit and PR-sized refactoring, with stack adapters), pr-describe (evidence-first PR descriptions), pr-risk (merge-risk assessment), pr-review (branch review with a verdict) and retro (session retrospectives that turn agent friction into checks, standards and skill fixes).",
       "category": "development",
       "tags": [
         "refactoring",

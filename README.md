@@ -1,11 +1,11 @@
 # aisoul skills
 
-A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`. The `pr` and `retro` skills work on any stack; the `untangle` skills are for Nuxt / Vue / TypeScript.
+A Claude Code plugin marketplace with my skills. One plugin, `aisoul`, so every skill is invoked as `/aisoul:<skill>`. All skills work on any stack; `untangle` gets deeper measurements from a stack adapter, with Nuxt / Vue / TypeScript built in.
 
 | Skill | Stack | What it does |
 |-------|-------|--------------|
-| `/aisoul:untangle-audit` | Nuxt / Vue / TS | Read-only structural audit, writes a decision log of PR-sized fixes |
-| `/aisoul:untangle-fix` | Nuxt / Vue / TS | Applies one fix from that log as one small PR |
+| `/aisoul:untangle-audit` | any (adapter: Nuxt) | Read-only structural audit, writes a decision log of PR-sized fixes |
+| `/aisoul:untangle-fix` | any (adapter: Nuxt) | Applies one fix from that log as one small PR |
 | `/aisoul:pr-describe` | any | Short, evidence-first PR description sized to the diff |
 | `/aisoul:pr-risk` | any | Merge-risk assessment in five dimensions, for a reviewer or as a self-check |
 | `/aisoul:pr-review` | any | Branch review with a verdict: bug hunt, context checks, gates, merge risk, paste-ready comments |
@@ -95,7 +95,7 @@ bash tests/pr.sh
 bash tests/pr-risk.sh
 bash tests/pr-review.sh
 bash tests/retro.sh
-shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
+shellcheck -x plugins/*/scripts/*/*.sh plugins/*/scripts/*/adapters/*/*.sh tests/*.sh
 ```
 
 CI runs the same checks on every push and pull request.
