@@ -1,32 +1,14 @@
 #!/usr/bin/env bash
-# Public surface: emit .d.ts declarations only, so the whole API of the
-# codebase fits in context. Optional. Needs vue-tsc in the project.
-# Type errors are fine as long as files are emitted. Writes $OUT/surface/.
+# Public surface (optional): runs the active adapter's surface.sh (see adapters/README.md).
+# Without an adapter for this stack, or without this step in it, it writes
+# an UNVERIFIED line to $OUT/surface/ and exits 0: the audit then finds these
+# by reading and says so in the log.
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib.sh
 source "$(dirname "$0")/lib.sh"
 
-TSCONFIG="${UNTANGLE_TSCONFIG:-}"
-if [ -z "$TSCONFIG" ]; then
-  for f in .nuxt/tsconfig.app.json .nuxt/tsconfig.json tsconfig.json; do
-    if [ -f "$f" ]; then TSCONFIG="$f"; break; fi
-  done
+if [ -n "$ADAPTER_DIR" ] && [ -f "$ADAPTER_DIR/surface.sh" ]; then
+  exec bash "$ADAPTER_DIR/surface.sh" "$@"
 fi
 
-rm -rf "$OUT/surface"
-set +e
-if command -v pnpm >/dev/null 2>&1; then
-  pnpm exec vue-tsc --declaration --emitDeclarationOnly --noEmit false \
-    --outDir "$OUT/surface" -p "$TSCONFIG" > "$OUT/surface.log" 2>&1
-else
-  npx --no-install vue-tsc --declaration --emitDeclarationOnly --noEmit false \
-    --outDir "$OUT/surface" -p "$TSCONFIG" > "$OUT/surface.log" 2>&1
-fi
-set -e
-
-n="$(find "$OUT/surface" -name '*.d.ts' 2>/dev/null | wc -l | tr -d ' ')"
-if [ "$n" -gt 0 ]; then
-  echo "surface: $n declaration files -> $OUT/surface/"
-else
-  echo "surface: nothing emitted (see $OUT/surface.log); fall back to subagent summaries" >&2
-fi
+echo "surface: UNVERIFIED, adapter '$ADAPTER' has no surface step; use subagent summaries per area" >&2

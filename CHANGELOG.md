@@ -2,6 +2,17 @@
 
 Versions of the `aisoul` plugin, newest first. Semver: major for breaking changes to a skill's name, arguments or output format; minor for new skills or capabilities; patch for fixes and wording.
 
+## 1.9.0 (2026-11-26)
+
+### untangle
+- Stack-neutral core with stack adapters. Git history, the patch census, the lens and both skills no longer assume Nuxt; everything stack-specific moved to `scripts/untangle/adapters/nuxt/` (detection, source folders, dependency-cruiser rules, knip, vue-tsc, and a `reference.md` with commands, tool caveats and Vue examples per finding kind). The contract for adding a stack is in `adapters/README.md`.
+- `adapter.sh` prints the adapter in use. Without one (`none`, or `UNTANGLE_ADAPTER=none`), `deps.sh`, `deadweight.sh` and `surface.sh` write an `UNVERIFIED` line and exit 0, and the audit finds those kinds by reading and says so in the log.
+- The core patch census also knows Python, PHP, Ruby, Go and Java escapes, swallowed errors and skipped tests; a catch with a typed parameter (`catch (e: unknown) {}`) now counts as swallowed, so JS/TS counts may rise slightly.
+- The history scripts refuse a shallow clone (exit 3) with a hint to use `fetch-depth: 0`, instead of reporting an empty, healthy-looking history. `UNTANGLE_ALLOW_SHALLOW=1` overrides.
+- Fix: the Nuxt deps step ran dependency-cruiser with whatever TypeScript a one-off install pulled; with an unsupported one it parsed no `.ts` files and reported "no dependency violations (0 modules)". It now runs next to `typescript@^6` (`UNTANGLE_TS_VERSION`), and a run that parsed 0 modules is marked `UNVERIFIED`. Audits made with earlier versions may have missed D findings from the graph.
+- Output files are now `deps.txt` and `deadweight.txt` (were `depcruise.txt` and `knip.txt`). Script paths in the skills are unchanged.
+- Without an adapter, default paths are `src/ lib/ app/`; with the Nuxt adapter they stay `app/ server/ shared/ src/`.
+
 ## 1.8.0 (2026-11-26)
 
 ### retro (new)

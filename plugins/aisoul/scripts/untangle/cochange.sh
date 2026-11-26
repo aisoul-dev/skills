@@ -6,6 +6,7 @@
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib.sh
 source "$(dirname "$0")/lib.sh"
+require_history
 
 TOP="${UNTANGLE_TOP:-60}"
 MAX="${UNTANGLE_MAX_FILES:-25}"

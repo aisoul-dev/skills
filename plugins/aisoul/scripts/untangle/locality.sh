@@ -4,6 +4,7 @@
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib.sh
 source "$(dirname "$0")/lib.sh"
+require_history
 
 git log --since="$SINCE" --no-merges --name-only --pretty=tformat:@@ -- "${PATHS[@]}" \
 | awk '/^@@$/ { if (n) print n; n = 0; next } NF { n++ } END { if (n) print n }' \

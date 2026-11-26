@@ -28,7 +28,7 @@ jobs:
           done
 
       - name: Shellcheck
-        run: shellcheck -x plugins/*/scripts/*/*.sh tests/*.sh
+        run: shellcheck -x plugins/*/scripts/*/*.sh plugins/*/scripts/*/adapters/*/*.sh tests/*.sh
 
       - name: Smoke tests
         run: |
